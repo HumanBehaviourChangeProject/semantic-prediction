@@ -327,7 +327,7 @@ errors.docs <- unlist(lapply(1:200, function(x) {
 plot(density(errors.arms),main="Errors")
 
 fileConn<-file("output.txt")
-writeLines(errors.arms, fileConn)
+writeLines(paste(errors.docs,'\n'), fileConn)
 close(fileConn)
 
 lines(density(errors.docs),col='blue')
