@@ -26,8 +26,7 @@ class FeaturePrediction(nn.Module):
         self.biobert = BertForSequenceClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
 
     def forward(self, data):
-        a = self.biobert(data)
-        return torch.sum(a.logits, dim=0)
+        return self.biobert(data)
 
 def get_features():
     with open("data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
@@ -86,7 +85,7 @@ def main(epochs, features, train_index, val_index, labels, device):
     no_improvement = 0
     epoch = 0
 
-    inputs = [pad_sequence([torch.tensor(x, device=device) for x in tokenizer(list(y[1])).input_ids], batch_first=True) for y in features]
+    inputs = [[torch.tensor(x, device=device) for x in tokenizer(list(y[1])).input_ids] for y in features]
     targed = torch.tensor(labels.iloc[:,1:].values, device=device).float()
 
     while epoch < epochs or no_improvement < 20:  # loop over the dataset multiple times
@@ -100,17 +99,19 @@ def main(epochs, features, train_index, val_index, labels, device):
         j = 0
         batch_size = 10
         val_loss = None
-        p = ""
-        for i in tqdm.tqdm(range(0, len(train_index)), postfix=p):
+        progress = tqdm.tqdm(range(0, len(train_index)))
+        for i in progress:
             optimizer.zero_grad()
             batch_index = train_index[i]
-            outputs = net(inputs[batch_index])
+            outputs = 0
+            for sentence in inputs[batch_index]:
+                outputs += net(sentence.unsqueeze(0)).logits
             loss = criterion(outputs, targed[batch_index].float())
             running_loss += loss.item()
             j += 1
             loss.backward()
             optimizer.step()
-            p = f"loss: {running_loss/j}, val_loss: {val_loss}"
+            progress.set_postfix_str(f"loss: {running_loss/j}, val_loss: {val_loss}")
         print("Evaluate...")
         val_out = net(features[val_index])
         val_loss = criterion(val_out, labels[val_index])
