@@ -9,7 +9,7 @@ import copy
 import numpy as np
 import random
 import torch
-from transformers import AutoTokenizer, AutoModelForMaskedLM, BertForSequenceClassification
+from transformers import AutoTokenizer, AutoModelForMaskedLM, BertModel
 from torch.nn.utils.rnn import pad_sequence, pad_packed_sequence
 
 def is_number(x):
@@ -23,10 +23,12 @@ def is_number(x):
 class FeaturePrediction(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
-        self.biobert = BertForSequenceClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
+        self.biobert = BertModel.from_pretrained("dmis-lab/biobert-base-cased-v1.2")
+        self.output = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, n_classes))
 
     def forward(self, data):
-        return self.biobert(data)
+        a = self.biobert(data)
+        return self.output(a.pooler_output)
 
 def get_features():
     with open("data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
@@ -107,7 +109,7 @@ def main(epochs, features, train_index, val_index, labels, device):
             batch_index = train_index[i]
             outputs = None
             for sentence in inputs[batch_index]:
-                o = net(sentence[:511].unsqueeze(0)).logits.squeeze(0)
+                o = net(sentence[:511].unsqueeze(0)).squeeze(0)
                 if outputs is not None:
                     outputs += o
                 else:
@@ -124,7 +126,7 @@ def main(epochs, features, train_index, val_index, labels, device):
             for i in list(val_index):
                 outputs = None
                 for sentence in inputs[i]:
-                    o = net(sentence[:511].unsqueeze(0)).logits.squeeze(0)
+                    o = net(sentence[:511].unsqueeze(0)).squeeze(0)
                     if outputs is not None:
                         outputs += o
                     else:
