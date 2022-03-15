@@ -132,7 +132,7 @@ def main(epochs, features, train_index, val_index, labels, device):
                     else:
                         outputs = o
                 val_loss_sum += criterion(outputs, targed[i]).item()
-                diffs.append((outputs-targed[i]).detach())
+                diffs.append((outputs-targed[i]).detach().cpu())
             val_loss = val_loss_sum/len(val_index)
 
 
