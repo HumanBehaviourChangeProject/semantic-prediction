@@ -107,7 +107,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         for i in progress:
             optimizer.zero_grad()
             batch_index = train_index[i]
-            outputs = torch.max(torch.concat([net(sentence[:511].unsqueeze(0)) for sentence in inputs[i]]), dim=0).values
+            outputs = torch.max(torch.cat([net(sentence[:511].unsqueeze(0)) for sentence in inputs[i]]), dim=0).values
             loss = criterion(outputs, targed[batch_index])
             running_loss += loss.item()
             j += 1
@@ -118,7 +118,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         with torch.no_grad():
             val_loss_sum = 0
             for i in list(val_index):
-                outputs = torch.max(torch.concat([net(sentence[:511].unsqueeze(0)) for sentence in inputs[i]]), dim=0).values
+                outputs = torch.max(torch.cat([net(sentence[:511].unsqueeze(0)) for sentence in inputs[i]]), dim=0).values
                 val_loss_sum += criterion(outputs, targed[i]).item()
                 diffs.append((outputs-targed[i]).detach().cpu())
             val_loss = val_loss_sum/len(val_index)
