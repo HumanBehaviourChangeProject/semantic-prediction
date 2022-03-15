@@ -43,6 +43,7 @@ def get_features():
             del d["document"]
             del d["document_id"]
             del d["arm"]
+            del d["Individual-level analysed"]
             data.append(d)
         df = pd.DataFrame(data)
         df.set_index("arm_id")
@@ -116,10 +117,10 @@ def main(epochs, features, train_index, val_index, labels, device):
             loss.backward()
             optimizer.step()
             progress.set_postfix_str(f"loss: {running_loss/j}, val_loss: {val_loss}")
-        print("Evaluate...")
-        with torch.no_grad:
+        diffs = []
+        with torch.no_grad():
             val_loss_sum = 0
-            for i in val_index:
+            for i in list(val_index):
                 outputs = None
                 for sentence in inputs[i]:
                     o = net(sentence[:511].unsqueeze(0)).logits.squeeze(0)
@@ -127,12 +128,13 @@ def main(epochs, features, train_index, val_index, labels, device):
                         outputs += o
                     else:
                         outputs = o
-                val_loss_sum += criterion(outputs, targed[i])
+                val_loss_sum += criterion(outputs, targed[i]).item()
+                diffs.append((outputs-targed[i]).detach())
             val_loss = val_loss_sum/len(val_index)
 
 
         if not best or val_loss - best[-1][0] < -0.05:
-            best.append((val_loss, copy.deepcopy(net), (val_out - labels[val_index]).squeeze(-1)))
+            best.append((val_loss, copy.deepcopy(net), diffs))
             best = sorted(best, key=lambda x: x[0])
             if not len(best) <= keep_top:
                 del best[-1]
@@ -141,7 +143,7 @@ def main(epochs, features, train_index, val_index, labels, device):
             no_improvement += 1
         # print statistics
         if epoch % 10 == 0:
-            print(f"epoch: {epoch},\tloss: {(running_loss / j)},\tval_loss: {val_loss.item()},\tno improvement since: {no_improvement}")
+            print(f"epoch: {epoch},\tloss: {(running_loss / j)},\tval_loss: {val_loss},\tno improvement since: {no_improvement}")
             running_loss = 0.0
             j = 0
         epoch += 1
