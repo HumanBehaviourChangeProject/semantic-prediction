@@ -1,3 +1,4 @@
+import tqdm
 from transformers import AutoModel
 from torch import nn, optim
 import csv
@@ -98,17 +99,19 @@ def main(epochs, features, train_index, val_index, labels, device):
         # forward + backward + optimize
         j = 0
         batch_size = 10
-        for i in range(0, len(train_index)):
+        val_loss = None
+        p = ""
+        for i in tqdm.tqdm(range(0, len(train_index)), postfix=p):
             optimizer.zero_grad()
             batch_index = train_index[i]
             outputs = net(inputs[batch_index])
             loss = criterion(outputs, targed[batch_index].float())
             running_loss += loss.item()
             j += 1
-            print(running_loss/j)
             loss.backward()
             optimizer.step()
-
+            p = f"loss: {running_loss/j}, val_loss: {val_loss}"
+        print("Evaluate...")
         val_out = net(features[val_index])
         val_loss = criterion(val_out, labels[val_index])
 
