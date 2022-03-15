@@ -88,6 +88,7 @@ def main(epochs, features, train_index, val_index, labels, device):
 
     inputs = [[torch.tensor(x, device=device) for x in tokenizer(list(y[1])).input_ids] for y in features]
     targed = torch.tensor(labels.iloc[:,1:].values, device=device).float()
+    val_loss = None
 
     while epoch < epochs or no_improvement < 20:  # loop over the dataset multiple times
         running_loss = 0.0
@@ -99,7 +100,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         # forward + backward + optimize
         j = 0
         batch_size = 10
-        val_loss = None
+
         progress = tqdm.tqdm(range(0, len(train_index)))
         for i in progress:
             optimizer.zero_grad()
