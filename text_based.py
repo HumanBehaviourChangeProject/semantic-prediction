@@ -103,9 +103,13 @@ def main(epochs, features, train_index, val_index, labels, device):
         for i in progress:
             optimizer.zero_grad()
             batch_index = train_index[i]
-            outputs = 0
+            outputs = None
             for sentence in inputs[batch_index]:
-                outputs += net(sentence.unsqueeze(0)).logits
+                o = net(sentence.unsqueeze(0)).logits.squeeze(0)
+                if outputs is not None:
+                    outputs += o
+                else:
+                    outputs = o
             loss = criterion(outputs, targed[batch_index].float())
             running_loss += loss.item()
             j += 1
