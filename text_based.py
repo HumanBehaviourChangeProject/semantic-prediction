@@ -110,15 +110,25 @@ def main(epochs, features, train_index, val_index, labels, device):
                     outputs += o
                 else:
                     outputs = o
-            loss = criterion(outputs, targed[batch_index].float())
+            loss = criterion(outputs, targed[batch_index])
             running_loss += loss.item()
             j += 1
             loss.backward()
             optimizer.step()
             progress.set_postfix_str(f"loss: {running_loss/j}, val_loss: {val_loss}")
         print("Evaluate...")
-        val_out = net(features[val_index])
-        val_loss = criterion(val_out, labels[val_index])
+        with torch.no_grad:
+            val_loss_sum = 0
+            for i in val_index:
+                outputs = None
+                for sentence in inputs[i]:
+                    o = net(sentence.unsqueeze(0)).logits.squeeze(0)
+                    if outputs is not None:
+                        outputs += o
+                    else:
+                        outputs = o
+                val_loss_sum += criterion(outputs, targed[i])
+            val_loss = val_loss_sum/len(val_index)
 
 
         if not best or val_loss - best[-1][0] < -0.05:
