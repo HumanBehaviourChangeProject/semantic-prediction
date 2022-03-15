@@ -105,7 +105,7 @@ def main(epochs, features, train_index, val_index, labels, device):
             batch_index = train_index[i]
             outputs = None
             for sentence in inputs[batch_index]:
-                o = net(sentence.unsqueeze(0)).logits.squeeze(0)
+                o = net(sentence[:511].unsqueeze(0)).logits.squeeze(0)
                 if outputs is not None:
                     outputs += o
                 else:
@@ -122,7 +122,7 @@ def main(epochs, features, train_index, val_index, labels, device):
             for i in val_index:
                 outputs = None
                 for sentence in inputs[i]:
-                    o = net(sentence.unsqueeze(0)).logits.squeeze(0)
+                    o = net(sentence[:511].unsqueeze(0)).logits.squeeze(0)
                     if outputs is not None:
                         outputs += o
                     else:
