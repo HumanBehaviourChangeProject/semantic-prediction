@@ -7,6 +7,9 @@ import json
 import copy
 import numpy as np
 import random
+import torch
+from transformers import AutoTokenizer, AutoModelForMaskedLM, BertForSequenceClassification
+from torch.nn.utils.rnn import pad_sequence, pad_packed_sequence
 
 def is_number(x):
     try:
@@ -19,15 +22,14 @@ def is_number(x):
 class FeaturePrediction(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
-        self.biobert = AutoModel.from_pretrained("dmis-lab/biobert-base-cased-v1.2")
-        self.discriminator = nn.Sequential(nn.Linear(100, 100), nn.ReLU(), nn.Linear(100, n_classes))
+        self.biobert = BertForSequenceClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
 
     def forward(self, data):
         a = self.biobert(data)
-        return self.discriminator(a)
+        return torch.sum(a.logits, dim=0)
 
 def get_features():
-    with open("/home/glauer/dev/hbcp/semantic_enhancements/data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
+    with open("data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
         reader = csv.reader(fin)
         head = next(reader)
         data = []
@@ -54,13 +56,14 @@ def cross_val(patience):
     step = len(index) // 10
     chunks = [index[i:i + step] for i in range(0, len(index), step)]
     texts = get_texts()
+    features[features == "-"] = 0
     for i in range(len(chunks)):
         train_index = [c for j in range(len(chunks)) for c in chunks[j] if i != j ]
         val_index = chunks[i]
-        best = main(patience, texts.items(), train_index, val_index, features)
+        best = main(patience, list(texts.items()), train_index, val_index, features.astype(float))
 
 def get_texts():
-    with open("/home/glauer/dev/hbcp/Info-extract/core/src/main/resources/data/jsons/All_annotations_512papers_05March20.json", "r") as fin:
+    with open("../Info-extract/core/src/main/resources/data/jsons/All_annotations_512papers_05March20.json", "r") as fin:
         texts = dict()
         for ref in json.load(fin)["References"]:
             featured_arms = {c["ArmId"] for c in ref["Codes"]}
@@ -70,13 +73,20 @@ def get_texts():
 
 
 def main(epochs, features, train_index, val_index, labels):
-    net = FeaturePrediction(labels.shape[1])
+    net = FeaturePrediction(labels.shape[1]-1)
+
+    tokenizer = AutoTokenizer.from_pretrained(
+        "dmis-lab/biobert-base-cased-v1.2")
+
     criterion = nn.MSELoss()
     optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
     best = []
     keep_top = 5
     no_improvement = 0
     epoch = 0
+
+    inputs = [pad_sequence([torch.tensor(x) for x in tokenizer(list(y[1])).input_ids], batch_first=True) for y in features]
+
     while epoch < epochs or no_improvement < 20:  # loop over the dataset multiple times
         running_loss = 0.0
         # get the inputs; data is a list of [inputs, labels]
@@ -87,13 +97,14 @@ def main(epochs, features, train_index, val_index, labels):
         # forward + backward + optimize
         j = 0
         batch_size = 10
-        for i in range(0, len(train_index), batch_size):
+        for i in range(0, len(train_index)):
             optimizer.zero_grad()
-            batch_index = train_index[i:i + batch_size]
-            outputs = net([features[i] for i in batch_index])
-            loss = criterion(outputs, labels[batch_index])
+            batch_index = train_index[i]
+            outputs = net(inputs[batch_index])
+            loss = criterion(outputs, torch.tensor(labels.iloc[batch_index,1:]).float())
             running_loss += loss.item()
             j += 1
+            print(running_loss/j)
             loss.backward()
             optimizer.step()
 
