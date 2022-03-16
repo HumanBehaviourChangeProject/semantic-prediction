@@ -86,7 +86,7 @@ def main(epochs, features, train_index, val_index, labels, device):
     tokenizer = AutoTokenizer.from_pretrained(
         "dmis-lab/biobert-base-cased-v1.2")
 
-    criterion = nn.MSELoss()
+    criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
     best = []
     keep_top = 5
