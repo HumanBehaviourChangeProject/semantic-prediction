@@ -46,6 +46,11 @@ def get_features():
             del d["document_id"]
             del d["arm"]
             del d["Individual-level analysed"]
+            del d["Mean age"]
+            del d["Proportion identifying as female gender"]
+            del d["Mean number of times tobacco used"]
+            del d["Combined follow up"]
+            del d["NEW Outcome value"]
             data.append(d)
         df = pd.DataFrame(data)
         df.set_index("arm_id")
