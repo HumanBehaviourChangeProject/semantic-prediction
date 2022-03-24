@@ -34,7 +34,7 @@ class FuzzySet:
             return 0
 
 def load_countries_and_cities():
-    with open("/home/glauer/.config/JetBrains/PyCharm2021.3/scratches/hbcp/data/worldcities.csv", "r") as fin:
+    with open("data/worldcities.csv", "r") as fin:
         reader = csv.reader(fin)
         header = next(reader)
         city_dict = {line[1]: line[4] for line in reader}
@@ -274,12 +274,12 @@ def rec_attr(cs):
 
 def load_prio():
     with open(
-            "/home/glauer/.PyCharm2019.3/config/scratches/hbcp/data/prio.txt", "r"
+            "data/prio.txt", "r"
     ) as fin:
         prio_names = [l.replace("\n", "") for l in fin]
 
     with open(
-            "/home/glauer/dev/hbcp/Info-extract/core/src/main/resources/data/jsons/All_annotations_512papers_05March20.json",
+            "data/All_annotations_512papers_05March20.json",
             "r",
     ) as fin:
         d = json.load(fin)
@@ -297,7 +297,7 @@ def load_id_map(init=None):
         id_map = init
 
     with open(
-            "/home/glauer/.PyCharm2019.3/config/scratches/hbcp/data/EntityMapping_27May21.csv",
+            "data/EntityMapping_27May21.csv",
             "r",
     ) as fin:
         r = csv.reader(fin)
@@ -412,7 +412,7 @@ def parse_int(textnum, numwords={}):
 
 def load_attributes(prio_names, id_map):
     with open(
-            "/home/glauer/.PyCharm2019.3/config/scratches/hbcp/data/trainAVs.txt", "r"
+            "data/trainAVs.txt", "r"
     ) as fin:
         d = json.load(fin)
 
@@ -669,7 +669,7 @@ def load_deleted():
     d = dict()
     arm_name_map = dict()
     with open(
-            "/home/glauer/.config/JetBrains/PyCharm2021.3/scratches/hbcp/data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
+            "data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
         reader = csv.reader(fin)
         header = next(reader)
         doc_attrs = dict()
