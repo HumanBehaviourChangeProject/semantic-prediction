@@ -60,7 +60,7 @@ reg.form = as.formula(paste("Outcome.value ~ ",
 model_mixed = lmer(reg.form, 
 									 data = df.clean,na.action = na.exclude)
 summary(model_mixed)
-confint(model_mixed)
+#confint(model_mixed)
 
 #print(model_mixed, correlation=TRUE)
 
@@ -70,11 +70,11 @@ barplot(fixef(model_mixed),las=2,cex.names = 0.5)
 summ(model_mixed)
 plot_summs(model_mixed)
 
-plot(fitted(model_mixed), resid(model_mixed, type = "pearson"))# this will create the plot
-abline(0,0, col="red")
+#plot(fitted(model_mixed), resid(model_mixed, type = "pearson"))# this will create the plot
+#abline(0,0, col="red")
 
-qqnorm(resid(model_mixed)) 
-qqline(resid(model_mixed), col = "red") # add a perfect fit line
+#qqnorm(resid(model_mixed)) 
+#qqline(resid(model_mixed), col = "red") # add a perfect fit line
 
 res.predict = predict(model_mixed)
 
@@ -462,9 +462,270 @@ docs.means[order(docs.means)]
 # par(opar)
 
 
+# --------------------------------------
+# Test specific variables in predictions
+# --------------------------------------
+
+
+# Create the 'default' starting sample, no interventions, just means of data points
+test <- df.clean[1,]
+
+test[['document_id']]=0
+test[['arm_id']]=0
+test[['control']]=0
+test[['Biochemical.verification']]=0
+test[['Website...Computer.Program...App']]=0
+test[['Mean.age']]=mean(df.clean$Mean.age)  # 34.46
+test[['Proportion.identifying.as.female.gender']]=mean(df.clean$Proportion.identifying.as.female.gender) #35.24
+test[['Mean.number.of.times.tobacco.used']]=mean(df.clean$Mean.number.of.times.tobacco.used) # 13.75
+test[['Pharmaceutical.company.competing.interest']]=0
+test[['Individual.level.analysed']]=mean(df.clean$Individual.level.analysed) # 314.12
+test[['Combined.follow.up']]=mean(df.clean$Combined.follow.up) # 38.91
+
+default <- test
+
+test[['control']]=1
+v.ctrl <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+test[['control']]=0
+v.pred <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+
+plot(x=c(1,2),y=c(v.ctrl,v.pred),ylim=c(0,30),
+		 xlim=c(0,3),pch=16,xaxt='n',xlab=NA,ylab="Predicted Outcome (% cessation)")
+axis(1, at=c(1,2), labels=c("Control","Intervention")) 
+
+test <- default
+
+
+
+# Specific intervention types (BCTs) 
+
+interventions <- colnames(df.clean)[5:19]
+
+res.interventions <- unlist(lapply(interventions, function(interv) {
+	test[[interv]] <- 1
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	test[[interv]] <- 0
+	res.int
+}))
+
+par(mar=c(10,4,2,2))
+plot(x=1:(length(res.interventions)+1),
+		 y=c(v.ctrl,res.interventions),ylim=c(0,30),
+		 xlim=c(0,(length(res.interventions)+2)),pch=16,xaxt='n',
+		 xlab=NA,ylab="Predicted Outcome (% cessation)")
+axis(1, at=1:(length(res.interventions)+1), 
+		 labels=c("Control",interventions),las=2,cex.axis=0.5) 
+par(mar=c(5.1, 4.1, 4.1, 2.1))
+
+test=default
+
+
+# Modes of Delivery 
+
+interventions <- colnames(df.clean)[c(20:23,36:38)]
+
+res.interventions <- unlist(lapply(interventions, function(interv) {
+	test[[interv]] <- 1
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	test[[interv]] <- 0
+	res.int
+}))
+
+par(mar=c(10,4,2,2))
+plot(x=1:(length(res.interventions)+1),
+		 y=c(v.ctrl,res.interventions),ylim=c(0,30),
+		 xlim=c(0,(length(res.interventions)+2)),pch=16,xaxt='n',
+		 xlab=NA,ylab="Predicted Outcome (% cessation)")
+axis(1, at=1:(length(res.interventions)+1), 
+		 labels=c("Control",interventions),las=2,cex.axis=0.5) 
+par(mar=c(5.1, 4.1, 4.1, 2.1))
+
+test=default
+
+# NRT types
+
+interventions <- colnames(df.clean)[24:35]
+
+res.interventions <- unlist(lapply(interventions, function(interv) {
+	test[[interv]] <- 1
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	test[[interv]] <- 0
+	res.int
+}))
+
+par(mar=c(10,4,2,2))
+plot(x=1:(length(res.interventions)+1),
+		 y=c(v.ctrl,res.interventions),ylim=c(0,30),
+		 xlim=c(0,(length(res.interventions)+2)),pch=16,xaxt='n',
+		 xlab=NA,ylab="Predicted Outcome (% cessation)")
+axis(1, at=1:(length(res.interventions)+1), 
+		 labels=c("Control",interventions),las=2,cex.axis=0.5) 
+par(mar=c(5.1, 4.1, 4.1, 2.1))
+
+test=default
+
+# People 
+
+
+interventions <- colnames(df.clean)[39:43]
+
+res.interventions <- unlist(lapply(interventions, function(interv) {
+	test[[interv]] <- 1
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	test[[interv]] <- 0
+	res.int
+}))
+
+par(mar=c(10,4,2,2))
+plot(x=1:(length(res.interventions)+1),
+		 y=c(v.ctrl,res.interventions),ylim=c(0,30),
+		 xlim=c(0,(length(res.interventions)+2)),pch=16,xaxt='n',
+		 xlab=NA,ylab="Predicted Outcome (% cessation)")
+axis(1, at=1:(length(res.interventions)+1), 
+		 labels=c("Control",interventions),las=2,cex.axis=0.5) 
+par(mar=c(5.1, 4.1, 4.1, 2.1))
+
+test=default
+
+
+# Setting and outcome type
+
+interventions <- colnames(df.clean)[c(48,49,50,52,54)]
+
+res.interventions <- unlist(lapply(interventions, function(interv) {
+	test[[interv]] <- 1
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	test[[interv]] <- 0
+	res.int
+}))
+
+par(mar=c(10,4,2,2))
+plot(x=1:(length(res.interventions)+1),
+		 y=c(v.ctrl,res.interventions),ylim=c(0,30),
+		 xlim=c(0,(length(res.interventions)+2)),pch=16,xaxt='n',
+		 xlab=NA,ylab="Predicted Outcome (% cessation)")
+axis(1, at=1:(length(res.interventions)+1), 
+		 labels=c("Control",interventions),las=2,cex.axis=0.5) 
+par(mar=c(5.1, 4.1, 4.1, 2.1))
+
+test=default
 
 
 
 
+# 
+# Numeric attributes
+# 
+
+attr.name <- "Mean.age"
+
+plot(df.clean[[attr.name]],df.clean$Outcome.value,pch=16,xlab=attr.name,
+		 col=unlist(lapply(df.clean$control,function(x) {if (x==0) {"black"} else {"grey"}})),
+		 ylab="Outcome (% cessation)")
 
 
+attr.values <- seq(0,100,by=5)
+attr.default <- mean(df.clean[[attr.name]])
+
+res.attrs <- unlist(lapply(attr.values, function(attrval) {
+	test[[attr.name]] <- attrval
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	print(res.int)
+	test[[attr.name]] <- attr.default
+	res.int
+}))
+
+plot(x=attr.values,
+		 	y=res.attrs,
+		 pch=16, ylim=c(0,30),
+		 xlab=attr.name,
+		 ylab="Predicted Outcome (% cessation)")
+abline(v=attr.default,col='red',lty=2)
+
+test=default
+
+# Proportion identifying as female
+
+attr.name <- "Proportion.identifying.as.female.gender"
+
+plot(df.clean[[attr.name]],df.clean$Outcome.value,pch=16,xlab=attr.name,
+		 col=unlist(lapply(df.clean$control,function(x) {if (x==0) {"black"} else {"grey"}})),
+		 ylab="Outcome (% cessation)")
+
+
+attr.values <- seq(0,100,by=5)
+attr.default <- mean(df.clean[[attr.name]])
+
+res.attrs <- unlist(lapply(attr.values, function(attrval) {
+	test[[attr.name]] <- attrval
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	print(res.int)
+	test[[attr.name]] <- attr.default
+	res.int
+}))
+
+plot(x=attr.values,
+		 y=res.attrs,
+		 pch=16, ylim=c(0,30),
+		 xlab=attr.name,
+		 ylab="Predicted Outcome (% cessation)")
+abline(v=attr.default,col='red',lty=2)
+
+test=default
+
+# Mean number of times tobacco used
+
+attr.name <- "Mean.number.of.times.tobacco.used"
+
+plot(df.clean[[attr.name]],df.clean$Outcome.value,pch=16,xlab=attr.name,
+		 col=unlist(lapply(df.clean$control,function(x) {if (x==0) {"black"} else {"grey"}})),
+		 ylab="Outcome (% cessation)")
+
+attr.values <- seq(0,50,by=5)
+attr.default <- mean(df.clean[[attr.name]])
+
+res.attrs <- unlist(lapply(attr.values, function(attrval) {
+	test[[attr.name]] <- attrval
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	print(res.int)
+	test[[attr.name]] <- attr.default
+	res.int
+}))
+
+plot(x=attr.values,
+		 y=res.attrs,
+		 pch=16, ylim=c(0,30),
+		 xlab=attr.name,
+		 ylab="Predicted Outcome (% cessation)")
+abline(v=attr.default,col='red',lty=2)
+
+test=default
+
+
+# Combined follow up 
+
+attr.name <- "Combined.follow.up"
+
+plot(df.clean[[attr.name]],df.clean$Outcome.value,pch=16,xlab=attr.name,
+		 col=unlist(lapply(df.clean$control,function(x) {if (x==0) {"black"} else {"grey"}})),
+		 ylab="Outcome (% cessation)")
+
+attr.values <- seq(0,150,by=5)
+attr.default <- mean(df.clean[[attr.name]])
+
+res.attrs <- unlist(lapply(attr.values, function(attrval) {
+	test[[attr.name]] <- attrval
+	res.int <- predict(model_mixed, newdata = test, allow.new.levels=TRUE)
+	print(res.int)
+	test[[attr.name]] <- attr.default
+	res.int
+}))
+
+plot(x=attr.values,
+		 y=res.attrs,
+		 pch=16, ylim=c(0,30),
+		 xlab=attr.name,
+		 ylab="Predicted Outcome (% cessation)")
+abline(v=attr.default,col='red',lty=2)
+
+test=default
