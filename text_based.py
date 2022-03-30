@@ -9,7 +9,7 @@ import copy
 import numpy as np
 import random
 import torch
-from transformers import AutoTokenizer, AutoModelForMaskedLM, BertModel
+from transformers import AutoTokenizer, AutoModelForMaskedLM, BertForSequenceClassification
 from torch.nn.utils.rnn import pad_sequence, pad_packed_sequence
 
 def is_number(x):
@@ -23,12 +23,12 @@ def is_number(x):
 class FeaturePrediction(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
-        self.biobert = BertModel.from_pretrained("dmis-lab/biobert-base-cased-v1.2")
-        self.output = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, n_classes))
+        self.biobert = BertForSequenceClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
+        #self.output = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, n_classes))
 
     def forward(self, data):
         a = self.biobert(data)
-        return self.output(a.pooler_output)
+        return a.logits #self.output(a.logits)
 
 def get_features():
     with open("data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
@@ -87,7 +87,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         "dmis-lab/biobert-base-cased-v1.2")
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
+    optimizer = optim.Adam(net.parameters(), lr=1e-4)
     best = []
     keep_top = 5
     no_improvement = 0
