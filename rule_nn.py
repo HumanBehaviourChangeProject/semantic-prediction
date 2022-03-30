@@ -6,7 +6,8 @@ from torch import nn
 from pathlib import Path
 import sys
 import torch
-from torch import nn
+from torch.nn import functional as nnf
+
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
 import os
@@ -56,13 +57,13 @@ class CYK(nn.Module):
         self.conjunctions = nn.Parameter(1-2*torch.rand((num_conjunctions, 2*num_variables), requires_grad=True))
         self.rule_weights = nn.Parameter(1-2*torch.rand((num_conjunctions, ), requires_grad=True))
         self.base = nn.Parameter(5 - 10 * torch.rand(1, requires_grad=True), )
-        self.non_lin = nn.Sigmoid()
+        self.non_lin = nn.Hardsigmoid()
         self.dropout = nn.Dropout(0.1)
 
     def forward(self, x0):
         mu = self.non_lin(self.conjunctions)
         x = torch.concat((x0, 1 - x0), dim=1)
-        x_exp = self.dropout(x.unsqueeze(1).expand((x.shape[0], self.num_conjunctions, x.shape[1])))
+        x_exp = x.unsqueeze(1).expand((-1, self.num_conjunctions, -1))
         x_pot = (mu * x_exp) + (1 - mu) #torch.pow(x_exp, mu)
         o = torch.min(x_pot, dim=-1)[0]
         return torch.sum(self.rule_weights*o, dim=-1).squeeze(-1)
@@ -77,21 +78,22 @@ def cross_val(patience, features, labels, variables):
     features[features.isnan()] = 0
     results = []
     with open("results/rule_nn.txt", "w") as fout:
-        for _ in range(100):
-            index = list(np.array(range(features.shape[0])))
-            random.shuffle(index)
-            step = len(index) // 10
-            chunks = [index[i:i + step] for i in range(0, len(index), step)]
-            for i in range(len(chunks)):
-                train_index = [c for j in range(len(chunks)) for c in chunks[j] if i != j ]
-                val_index = chunks[i]
-                best = main(patience, features, labels, train_index, val_index, variables)
-                results.append(best)
-                for x in best[2]:
-                    fout.write(str(x.item()) + "\n")
-                fout.flush()
+        with open("results/rules.txt", "w") as frules:
+            for _ in range(100):
+                index = list(np.array(range(features.shape[0])))
+                random.shuffle(index)
+                step = len(index) // 5
+                chunks = [index[i:i + step] for i in range(0, len(index), step)]
+                for i in range(len(chunks)):
+                    train_index = [c for j in range(len(chunks)) for c in chunks[j] if i != j ]
+                    val_index = chunks[i]
+                    best = main(patience, features, labels, train_index, val_index, variables, frules)
+                    results.append(best)
+                    for x in best[2]:
+                        fout.write(str(x.item()) + "\n")
+                    fout.flush()
 
-def main(epochs, features, labels, train_index, val_index, variables):
+def main(epochs, features, labels, train_index, val_index, variables, frules):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
     net = CYK(features.shape[1], 100, 3)
     criterion = nn.MSELoss()
@@ -152,6 +154,9 @@ def main(epochs, features, labels, train_index, val_index, variables):
             running_loss = 0.0
             j = 0
         epoch += 1
+    best_model = best[0][1]
+    rules = torch.concat((nnf.hardsigmoid(best_model.conjunctions), best_model.rule_weights.unsqueeze(-1)),dim=-1)
+    frules.write(";".join("&".join(str(v.item()) for v in row) for row in rules) + "\n")
     print('Finished Training')
     return best[0]
 
