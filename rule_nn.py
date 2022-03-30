@@ -74,7 +74,13 @@ class CYK(nn.Module):
             yield " & ".join(v for v, c in zip(variables + [f"not {v}" for v in variables], weights[i]) if c > 0.5) + " => " + str(self.rule_weights[i].item())
 
 def cross_val(patience, features, labels, variables):
+    if torch.cuda.is_available():
+        device = "cuda:0"
+    else:
+        device = "cpu"
 
+    features.to(device)
+    labels.to(device)
     features[features.isnan()] = 0
     results = []
     with open("results/rule_nn.txt", "w") as fout:
@@ -87,15 +93,16 @@ def cross_val(patience, features, labels, variables):
                 for i in range(len(chunks)):
                     train_index = [c for j in range(len(chunks)) for c in chunks[j] if i != j ]
                     val_index = chunks[i]
-                    best = main(patience, features, labels, train_index, val_index, variables, frules)
+                    best = main(patience, features, labels, train_index, val_index, variables, frules, device)
                     results.append(best)
                     for x in best[2]:
                         fout.write(str(x.item()) + "\n")
                     fout.flush()
 
-def main(epochs, features, labels, train_index, val_index, variables, frules):
+def main(epochs, features, labels, train_index, val_index, variables, frules, device):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
     net = CYK(features.shape[1], 100, 3)
+    net.to(device)
     criterion = nn.MSELoss()
     val_criterion = nn.L1Loss()
     optimizer = optim.Adam(net.parameters(), lr=1e-3)
@@ -113,7 +120,7 @@ def main(epochs, features, labels, train_index, val_index, variables, frules):
         # zero the parameter gradients
 
         # forward + backward + optimize
-        e = 0.5*torch.sigmoid(torch.tensor(epoch/30-10))
+        e = 0.5*torch.sigmoid(torch.tensor(epoch/30-10, device=device))
         batch_size = 10
         random.shuffle((train_index))
 
@@ -126,7 +133,7 @@ def main(epochs, features, labels, train_index, val_index, variables, frules):
             w = net.non_lin(net.conjunctions)
             base_loss = criterion(outputs, batch_labels)
             custom_l2_reg = e*torch.mean(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
-            custom_l2_reg2 = e*torch.mean(torch.max(torch.sum(w, dim=-1)-4, torch.tensor(0)), dim=0) # penalty for long rules
+            custom_l2_reg2 = e*torch.mean(torch.max(torch.sum(w, dim=-1)-4, torch.tensor(0, device=device)), dim=0) # penalty for long rules
             loss = base_loss + custom_l2_reg + custom_l2_reg2
             loss.backward()
             optimizer.step()
