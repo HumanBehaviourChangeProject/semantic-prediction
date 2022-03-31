@@ -11,6 +11,7 @@ if (!require("vioplot")) install.packages("vioplot"); library(vioplot)
 if (!require("merTools")) install.packages("merTools"); library(merTools)
 if (!require("leaps")) install.packages("leaps"); library(leaps)
 if (!require("shiny")) install.packages("shiny"); library(shiny)
+if (!require("data.table")) install.packages("data.table"); library(data.table)
 
 
 # LOAD DATA etc. 
@@ -103,10 +104,13 @@ source = list("Health professional" = "Health.Professional",
 							"Nurse" = "nurse" ,                                                      
 							"Psychologist" = "pychologist" )
 
+pharma = list("Pharmaceutical company funding" = "Pharmaceutical.company.funding"  ,
+							"Pharmaceutical company competing interest" ="Pharmaceutical.company.competing.interest")
+
 outcome = list("Continuous abstinence" = "Abstinence..Continuous." ,                                    
 							 "Point prevalence abstinence" = "Abstinence..Point.Prevalence." )
 
-# Define UI for app that draws a histogram ----
+# Define UI for app ----
 ui <- fluidPage(
 	
 	# App title ----
@@ -120,30 +124,6 @@ ui <- fluidPage(
 				"intervention",
 				"Intervention",
 				choices = intervention
-			),
-			
-			sliderInput(
-				"meanAge",
-				"Mean age",
-				min(df.clean$Mean.age),
-				max(df.clean$Mean.age),
-				mean(df.clean$Mean.age)
-			),
-			
-			sliderInput(
-				"proportionFemale",
-				"Proportion female",
-				0,
-				100,
-				mean(df.clean$Proportion.identifying.as.female.gender)
-			),
-			
-			sliderInput(
-				"tobaccoUsed",
-				"Mean number of times tobacco used",
-				min(df.clean$Mean.number.of.times.tobacco.used),
-				30,
-				median(df.clean$Mean.number.of.times.tobacco.used)
 			),
 			
 			checkboxGroupInput(
@@ -167,25 +147,6 @@ ui <- fluidPage(
 						selected="placebo"
 					)
 			),
-				
-			radioButtons(
-				"outcome",
-				"Outcome",
-				choices = outcome
-			),
-			
-			checkboxInput(
-				"Biochemical.verification",
-				"Biochemical verification"
-			),
-			
-			sliderInput(
-				"followup",
-				"Follow up (weeks)",
-				min(df.clean$Combined.follow.up),
-				max(df.clean$Combined.follow.up),
-				median(df.clean$Combined.follow.up)
-			),
 			
 			
 		),
@@ -193,26 +154,91 @@ ui <- fluidPage(
 		# Main panel for displaying outputs ----
 		mainPanel(
 			
-			plotOutput(outputId = "predPlot")#,
+			fluidRow(
+				
+				column(4,
+							 
+							 	sliderInput(
+							 		"meanAge",
+							 		"Mean age",
+							 		min(df.clean$Mean.age),
+							 		max(df.clean$Mean.age),
+							 		mean(df.clean$Mean.age)
+							 	),
+							 	
+							 	sliderInput(
+							 		"proportionFemale",
+							 		"Proportion female",
+							 		0,
+							 		100,
+							 		mean(df.clean$Proportion.identifying.as.female.gender)
+							 	)
+							 
+							 
+				),
+				column(4,
+							 
+							 	sliderInput(
+							 		"tobaccoUsed",
+							 		"Mean number of times tobacco used",
+							 		min(df.clean$Mean.number.of.times.tobacco.used),
+							 		30,
+							 		median(df.clean$Mean.number.of.times.tobacco.used)
+							 	),
+							 checkboxInput(
+							 	"patientRole",
+							 	"Patient role?"
+							 )
+							 
+				),
+				column(4,
+							 
+							 		radioButtons(
+							 			"outcome",
+							 			"Outcome",
+							 			choices = outcome
+							 		),
+							 		
+							 		checkboxInput(
+							 			"Biochemical.verification",
+							 			"Biochemical verification"
+							 		),
+							 		
+							 		sliderInput(
+							 			"followup",
+							 			"Follow up (weeks)",
+							 			min(df.clean$Combined.follow.up),
+							 			as.integer(max(df.clean$Combined.follow.up)),
+							 			median(df.clean$Combined.follow.up)
+							 		),
+							  
+				)
+			),
 			
-			#plotOutput(outputId = "summsPlot")
+			column(12,
+				plotOutput(outputId = "predPlot"),
+			),
 			
+			column(4,
+				fluidRow(htmlOutput("text")),
+			),
 			
+			column(8,
+				plotOutput(outputId = "pcaPlot")
+			)
 		)
 	)
 )
 
 
-# Define server logic required to draw a histogram ----
+# Define server logic required  ----
 server <- function(input, output) {
 	
 #	output$summsPlot <- renderPlot({
 #		plot_summs(model_mixed) #
 #	})
 	
-	output$predPlot <- renderPlot({
-		#print(input$intervention)
-		
+	preparePrediction <- function(input) {
 		test <- df.clean[1,]
 		
 		# Baseline
@@ -227,6 +253,7 @@ server <- function(input, output) {
 		test[['Mean.number.of.times.tobacco.used']]=input$tobaccoUsed
 		test[['Individual.level.analysed']]=mean(df.clean$Individual.level.analysed) # 314.12
 		test[['Combined.follow.up']]=input$followup
+		test[['aggregate.patient.role']]=input$patientRole
 		
 		control <- test
 		control [['control']] = 1
@@ -248,21 +275,95 @@ server <- function(input, output) {
 			control[[outc]] <- 1
 		})
 		
-		pred <- predictInterval(model_mixed,newdata=rbind.data.frame(control,test),n.sims = 999,ignore.fixed.terms = T)
+		return( list(test,control) )
+	}
+	
+
+	
+	output$text <- renderText(
+		{
+			vals = preparePrediction(input)
+			test  = vals[[1]]
+			control = vals[[2]]
+			
+			pca <- prcomp(df.datavars,scale=T)
+			
+			testpoint <- predict(pca,newdata = test)
+			ctrlpoint <- predict(pca,newdata = control)
+			
+			testdists <- data.table((pca$x[,1]-testpoint[1])^2
+															+(pca$x[,2]-testpoint[2])^2)
+			closesttests <- paste(rownames(pca$x)[order(testdists[,"V1"])][1:3],collapse='</li><li>')
+			ctrldists <- data.table((pca$x[,1]-ctrlpoint[1])^2
+															+(pca$x[,2]-ctrlpoint[2])^2)
+			closestctrls <- paste(rownames(pca$x)[order(ctrldists[,"V1"])][1:3],collapse='</li><li>')
+			
+			#print(testdists)
+			
+			paste("<b>Closest to baseline: </b><br/><ul><li>",closestctrls,"</li></ul><br/><b>Closest to intervention: </b><br/><ul><li>",closesttests,"</li></ul>")  # Todo: Which is the most likely intervention to succeed for the given population/setting/etc? 
+		}
+	)
+	
+	output$predPlot <- renderPlot({
+		#print(input$intervention)
+		
+		vals = preparePrediction(input)
+		test  = vals[[1]]
+		control = vals[[2]]
+		
+		pred <- predictInterval(model_mixed,
+														newdata=rbind.data.frame(control,test),
+														n.sims = 99,
+														level=0.4)
 		
 		plotCI(x = c(1,2),               # plotrix plot with confidence intervals
 					 y = pred$fit,
 					 li = pred$lwr,
 					 ui = pred$upr,
-					 col='black',
+					 col=c('blue','red'),
 					 scol='grey',
 					 pch=16,
 					 ylab="Predicted outcome value (% cessation)",
 					 ylim=c(0,50),
 					 xaxt='n',
 					 xlim=c(0,3),
-					 xlab=NA)
+					 xlab=NA,
+					 main="Prediction")
 		axis(side=1, at=c(1,2), labels = c("Baseline","Intervention"))
+	})
+	
+	
+	output$pcaPlot <- renderPlot({
+		# Most similar paper ? Could be determined by a similarity metric to the annotation dataset ? 
+		pcacols <- c(3:46,48:54)
+		df.datavars <- df.clean[,pcacols]
+		rownames(df.datavars) <- paste(df.attrs$document,'-',df.attrs$arm)
+		
+		pca <- prcomp(df.datavars,scale=T)
+		
+		vals = preparePrediction(input)
+		test  = vals[[1]]
+		control = vals[[2]]
+		
+		point <- predict(pca,newdata = test)
+		ctrlp <- predict(pca,newdata = control)
+		
+		fviz_pca_ind(pca, 
+								 geom.ind = "point", 
+								 pointshape = 21, 
+								 pointsize = 2, 
+								 fill.ind = factor(df.datavars$control), 
+								 col.ind = "black", 
+								 palette = c("lightgrey", "darkgrey"),#"jco", 
+								 addEllipses = FALSE,
+								 label = "var",
+								 col.var = "black",
+								 repel = TRUE,
+								 legend.title = "Control") +
+			ggtitle("", subtitle = waiver()) +
+			annotate("point", x=point[1], y=point[2], colour="red",size = 3) + 
+			annotate("point", x=ctrlp[1], y=ctrlp[2], colour="blue",size = 3)
+		
 	})
 	
 }

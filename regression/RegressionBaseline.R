@@ -14,6 +14,9 @@ if (!require("vioplot")) install.packages("vioplot"); library(vioplot)
 if (!require("merTools")) install.packages("merTools"); library(merTools)
 if (!require("leaps")) install.packages("leaps"); library(leaps)
 
+if (!require("plotrix")) install.packages("plotrix"); library(plotrix)
+if (!require("factoextra")) install.packages("factoextra"); library(plotrix)
+
 
 # Load the data 
 
@@ -46,7 +49,16 @@ df.clean$Mean.age <- as.numeric(df.clean$Mean.age)
 df.clean$Proportion.identifying.as.female.gender <- as.numeric(df.clean$Proportion.identifying.as.female.gender)
 df.clean$Mean.number.of.times.tobacco.used <- as.numeric(df.clean$Mean.number.of.times.tobacco.used)	
 df.clean$Individual.level.analysed <- as.numeric(df.clean$Individual.level.analysed)
+
+# Clean data: these attributes should be imputed (using the mean value, check median as well) 
+df.clean$Mean.age[is.na(df.clean$Mean.age)] <- mean(df.clean$Mean.age,na.rm=T)
+df.clean$Proportion.identifying.as.female.gender[is.na(df.clean$Proportion.identifying.as.female.gender)] <- mean(df.clean$Proportion.identifying.as.female.gender,na.rm=T)
+df.clean$Mean.number.of.times.tobacco.used[is.na(df.clean$Mean.number.of.times.tobacco.used)] <- mean(df.clean$Mean.number.of.times.tobacco.used,na.rm=T)
+# For the rest of the attributes, replace NAs with 0
 df.clean[is.na(df.clean)]=0
+
+
+
 names(df.clean)[names(df.clean) == 'NEW.Outcome.value'] <- 'Outcome.value'
 
 colnames.vars <- colnames(df.clean)[3:54]
@@ -91,7 +103,7 @@ plot(df.clean$Outcome.value,mapply(df.clean$Outcome.value,res.predict,FUN=functi
 # What is the error of the prediction ? 
 
 RMSE.merMod(model_mixed, scale = FALSE)
-# This gives => 5.27218   UPDATE=5.244
+# This gives => 5.27218   UPDATE=5.244  UPDATE AFTER IMPUTATION: 5.229
 
 mean((df.clean$Outcome.value - res.predict)^2)
 # This gives => 27.79589
@@ -729,3 +741,73 @@ plot(x=attr.values,
 abline(v=attr.default,col='red',lty=2)
 
 test=default
+
+
+
+
+
+# Look at prediction intervals rather than specific points
+# Confidence intervals coming from the fixed/random effects
+
+preds <- predictInterval(model_mixed, newdata = df.clean, n.sims = 999,ignore.fixed.terms = T)
+
+
+plotCI(x = df.clean$Outcome.value,               # plotrix plot with confidence intervals
+			 y = preds$fit,
+			 li = preds$lwr,
+			 ui = preds$upr,
+			 col='black',
+			 scol='grey',
+			 pch=16,
+			 ylab="Predicted outcome value (% cessation)",
+			 xlab="Outcome value (% cessation)")
+
+plot(density(preds$upr-preds$lwr),main="Confidence interval around predictions")
+abline(v=mean(preds$upr-preds$lwr),col="red",lty=2)
+
+# Which document ID is average? 
+ranefs <- ranef(model_mixed)
+plot(density(as.numeric(ranefs$document_id[,1])),main="Random effects")
+abline(v=mean(ranefs$document_id[,1]),col='red',lty=2)
+
+ranefs$document_id[which(ranefs$document_id >0),]
+
+# An average random effects document ID: 437572 (0.188497957)
+test['document_id'] = 437572
+
+pred <- predictInterval(model_mixed,newdata=test,n.sims = 999,ignore.fixed.terms = T)
+
+plotCI(x = c(1),               # plotrix plot with confidence intervals
+			 y = pred$fit,
+			 li = pred$lwr,
+			 ui = pred$upr,
+			 col='black',
+			 scol='grey',
+			 pch=16,
+			 ylab="Predicted outcome value (% cessation)",
+			 ylim=c(0,50),
+			 xaxt='n',
+			 xlab=NA)
+
+# Most similar paper ? Could be determined by a similarity metric to the annotation dataset ? 
+pcacols <- c(3:46,48:54)
+df.datavars <- df.clean[,pcacols]
+rownames(df.datavars) <- paste(df.attrs$document,'-',df.attrs$arm)
+
+pca <- prcomp(df.datavars,scale=T)
+
+point <- predict(pca,newdata = test)
+
+fviz_pca_ind(pca, geom.ind = "point", pointshape = 21, 
+						 pointsize = 2, 
+						 fill.ind = factor(df.datavars$control), 
+						 col.ind = "black", 
+						 palette = "jco", 
+						 addEllipses = FALSE,
+						 label = "var",
+						 col.var = "black",
+						 repel = TRUE,
+						 legend.title = "Control") +
+	ggtitle("2D PCA-plot") +
+	theme(plot.title = element_text(hjust = 0.5)) + 
+	annotate("point", x=point[1], y=point[2], colour="red",size = 3)
