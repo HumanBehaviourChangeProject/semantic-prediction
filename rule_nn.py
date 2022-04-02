@@ -16,6 +16,7 @@ from torch import autograd
 import copy
 import numpy as np
 
+
 def and_(x, y):
     return x * y
 
@@ -48,6 +49,8 @@ class LogicLayer(nn.Module):
     def forward(self, x):
         return torch.stack([f(x) for f in self.filters], dim=1)
 
+
+
 class CYK(nn.Module):
 
     def __init__(self, num_variables, num_conjunctions, layers):
@@ -55,9 +58,9 @@ class CYK(nn.Module):
         super().__init__()
         self.num_conjunctions = num_conjunctions
         self.conjunctions = nn.Parameter(1-2*torch.rand((num_conjunctions, 2*num_variables), requires_grad=True))
-        self.rule_weights = nn.Parameter(1-2*torch.rand((num_conjunctions, ), requires_grad=True))
+        self.rule_weights = nn.Parameter(10-20*torch.rand((num_conjunctions, ), requires_grad=True))
         self.base = nn.Parameter(5 - 10 * torch.rand(1, requires_grad=True), )
-        self.non_lin = nn.Hardsigmoid()
+        self.non_lin = nn.Sigmoid()
         self.dropout = nn.Dropout(0.1)
 
     def forward(self, x0):
@@ -65,8 +68,8 @@ class CYK(nn.Module):
         x = torch.concat((x0, 1 - x0), dim=1)
         x_exp = x.unsqueeze(1).expand((-1, self.num_conjunctions, -1))
         x_pot = (mu * x_exp) + (1 - mu) #torch.pow(x_exp, mu)
-        o = torch.min(x_pot, dim=-1)[0]
-        return torch.sum(self.rule_weights*o, dim=-1).squeeze(-1)
+        o = torch.prod(x_pot, dim=-1)
+        return self.base + torch.sum(self.rule_weights*o, dim=-1).squeeze(-1)
 
     def print_rules(self, variables):
         weights = self.non_lin(self.conjunctions)
@@ -120,7 +123,7 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
         # zero the parameter gradients
 
         # forward + backward + optimize
-        e = 0.5*torch.sigmoid(torch.tensor(epoch/30-10, device=device))
+        e = torch.sigmoid(torch.tensor(epoch/10-3, device=device))
         batch_size = 10
         random.shuffle((train_index))
 
@@ -131,10 +134,9 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
             batch_labels = labels[batch_index].squeeze(-1)
             outputs = net(features[batch_index])
             w = net.non_lin(net.conjunctions)
-            base_loss = criterion(outputs, batch_labels)
-            custom_l2_reg = e*torch.mean(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
-            custom_l2_reg2 = e*torch.mean(torch.max(torch.sum(w, dim=-1)-4, torch.tensor(0, device=device)), dim=0) # penalty for long rules
-            loss = base_loss + custom_l2_reg + custom_l2_reg2
+            loss = criterion(outputs, batch_labels)
+            loss += 5*e*torch.mean(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
+            loss += 2*e*torch.mean(torch.sum(w, dim=-1), dim=0) # penalty for long rules
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -162,7 +164,7 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
             j = 0
         epoch += 1
     best_model = best[0][1]
-    rules = torch.concat((nnf.hardsigmoid(best_model.conjunctions), best_model.rule_weights.unsqueeze(-1)),dim=-1)
+    rules = torch.cat((nnf.hardsigmoid(best_model.conjunctions), best_model.rule_weights.unsqueeze(-1)),dim=-1)
     frules.write(";".join("&".join(str(v.item()) for v in row) for row in rules) + "\n")
     print('Finished Training')
     return best[0]
