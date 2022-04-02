@@ -1,4 +1,3 @@
-from fpgrowth_py import fpgrowth
 
 with open("results/rules.txt", "r") as fin:
 
@@ -13,7 +12,7 @@ with open("results/rules.txt", "r") as fin:
 
 with open("results/frequents.txt", "w") as fout:
 
-    items = list(range(len(rulessets[0][0])))
+    items = list(range(len(rulessets[0][0][0])))
     transactions = [{i for i, v in enumerate(con) if v} for rule in rulessets for con, _ in rule]
     initial_item_sets = [frozenset({x}) for x in items]
 
@@ -24,7 +23,6 @@ with open("results/frequents.txt", "w") as fout:
         for itms, frequency in nxt:
             fout.write("&".join(map(str, itms)) + ";" + str(frequency) + "\n")
         current = [frozenset({n}.union(i)) for i,l in nxt for n in items if n > max(i)]
-        print(current)
-        #fout.flush()
+        fout.flush()
 
 
