@@ -291,12 +291,12 @@ server <- function(input, output) {
 			testpoint <- predict(pca,newdata = test)
 			ctrlpoint <- predict(pca,newdata = control)
 			
-			testdists <- data.table((pca$x[,1]-testpoint[1])^2
+			testdists <- as.numeric((pca$x[,1]-testpoint[1])^2
 															+(pca$x[,2]-testpoint[2])^2)
-			closesttests <- paste(rownames(pca$x)[order(testdists[,"V1"])][1:3],collapse='</li><li>')
-			ctrldists <- data.table((pca$x[,1]-ctrlpoint[1])^2
+			closesttests <- paste(rownames(pca$x)[order(testdists)][1:3],collapse='</li><li>')
+			ctrldists <- as.numeric((pca$x[,1]-ctrlpoint[1])^2
 															+(pca$x[,2]-ctrlpoint[2])^2)
-			closestctrls <- paste(rownames(pca$x)[order(ctrldists[,"V1"])][1:3],collapse='</li><li>')
+			closestctrls <- paste(rownames(pca$x)[order(ctrldists)][1:3],collapse='</li><li>')
 			
 			#print(testdists)
 			
@@ -313,8 +313,8 @@ server <- function(input, output) {
 		
 		pred <- predictInterval(model_mixed,
 														newdata=rbind.data.frame(control,test),
-														n.sims = 99,
-														level=0.4)
+														n.sims = 599,
+														level=0.5)
 		
 		plotCI(x = c(1,2),               # plotrix plot with confidence intervals
 					 y = pred$fit,
