@@ -1,3 +1,5 @@
+setwd("/Users/hastingj/Work/Python/semantic-prediction/regression")
+
 
 if (!require('xlsx',quietly = T)) install.packages('xlsx'); library('xlsx')
 if (!require('tidyverse',quietly = T)) install.packages('tidyverse'); library(tidyverse)
@@ -13,11 +15,15 @@ if (!require("leaps")) install.packages("leaps"); library(leaps)
 if (!require("shiny")) install.packages("shiny"); library(shiny)
 if (!require("data.table")) install.packages("data.table"); library(data.table)
 
+if (!require("plotrix")) install.packages("plotrix"); library(plotrix)
+if (!require("factoextra")) install.packages("factoextra"); library(plotrix)
+
 
 # LOAD DATA etc. 
 
-df.clean <- read.xlsx("cleaned_dataset_13Feb2022_notes_removed_control-2.xlsx", 
+df.attrs <- read.xlsx("cleaned_dataset_13Feb2022_notes_removed_control-2.xlsx", 
 											sheetIndex = 1)
+df.clean <- df.attrs
 
 ## Various cleaning transformations
 
@@ -278,13 +284,15 @@ server <- function(input, output) {
 		return( list(test,control) )
 	}
 	
-
-	
 	output$text <- renderText(
 		{
 			vals = preparePrediction(input)
 			test  = vals[[1]]
 			control = vals[[2]]
+			
+			pcacols <- c(3:46,48:54)
+			df.datavars <- df.clean[,pcacols]
+			rownames(df.datavars) <- paste(df.attrs$document,'-',df.attrs$arm)
 			
 			pca <- prcomp(df.datavars,scale=T)
 			
@@ -368,5 +376,5 @@ server <- function(input, output) {
 	
 }
 
-
+options(shiny.port = 5001)
 shinyApp(ui = ui, server = server)
