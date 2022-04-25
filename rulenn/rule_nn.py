@@ -53,13 +53,17 @@ class LogicLayer(nn.Module):
 
 class CYK(nn.Module):
 
-    def __init__(self, num_variables, num_conjunctions, layers):
+    def __init__(self, num_variables, num_conjunctions, layers,config=None):
         assert layers > 0
         super().__init__()
         self.num_conjunctions = num_conjunctions
-        self.conjunctions = nn.Parameter(1-2*torch.rand((num_conjunctions, 2*num_variables), requires_grad=True))
-        self.rule_weights = nn.Parameter(10-20*torch.rand((num_conjunctions, ), requires_grad=True))
-        self.base = nn.Parameter(5 - 10 * torch.rand(1, requires_grad=True), )
+        if config is None:
+            self.conjunctions = nn.Parameter(1-2*torch.rand((num_conjunctions, 2*num_variables), requires_grad=True))
+            self.rule_weights = nn.Parameter(10-20*torch.rand((num_conjunctions, ), requires_grad=True))
+        else:
+            self.conjunctions = nn.Parameter(config["conjunctions"], requires_grad=True)
+            self.rule_weights = nn.Parameter(config["rule_weights"], requires_grad=True)
+        #self.base = nn.Parameter(5 - 10 * torch.rand(1, requires_grad=True), )
         self.non_lin = nn.Sigmoid()
         self.dropout = nn.Dropout(0.1)
 
@@ -69,7 +73,7 @@ class CYK(nn.Module):
         x_exp = x.unsqueeze(1).expand((-1, self.num_conjunctions, -1))
         x_pot = (mu * x_exp) + (1 - mu) #torch.pow(x_exp, mu)
         o = torch.prod(x_pot, dim=-1)
-        return self.base + torch.sum(self.rule_weights*o, dim=-1).squeeze(-1)
+        return 10 + torch.sum(self.rule_weights*o, dim=-1).squeeze(-1)
 
     def print_rules(self, variables):
         weights = self.non_lin(self.conjunctions)
@@ -101,6 +105,7 @@ def cross_val(patience, features, labels, variables):
                     for x in best[2]:
                         fout.write(str(x.item()) + "\n")
                     fout.flush()
+                    exit()
 
 def main(epochs, features, labels, train_index, val_index, variables, frules, device):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
@@ -135,8 +140,10 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
             outputs = net(features[batch_index])
             w = net.non_lin(net.conjunctions)
             loss = criterion(outputs, batch_labels)
-            loss += 5*e*torch.mean(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
-            loss += 2*e*torch.mean(torch.sum(w, dim=-1), dim=0) # penalty for long rules
+            loss += e*torch.sum(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
+            m = torch.max((torch.stack((torch.sum(w, dim=-1)-3, torch.zeros(w.shape[:-1])))), dim=0)
+            loss += 0.5*e*torch.sum(m[0], dim=0)# penalty for long rules
+            loss += 5*e*torch.sum(1-torch.max(w, dim=-1)[0], dim=0)# penalty for rules without ones
             loss.backward()
             optimizer.step()
             running_loss += loss.item()
@@ -149,14 +156,15 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
             val_rmse = val_criterion(val_out, labels[val_index].squeeze(-1))**0.5
             net.train()
 
-        if not best or val_loss - best[-1][0] < -0.05:
-            best.append((val_loss, copy.deepcopy(net), val_out - labels[val_index].squeeze(-1)))
-            best = sorted(best, key=lambda x: x[0])
-            if not len(best) <= keep_top:
-                del best[-1]
-            no_improvement = 0
-        else:
-            no_improvement += 1
+        if epoch > 300:
+            if not best or val_loss - best[-1][0] < -0.05:
+                best.append((val_loss, copy.deepcopy(net), val_out - labels[val_index].squeeze(-1)))
+                best = sorted(best, key=lambda x: x[0])
+                if not len(best) <= keep_top:
+                    del best[-1]
+                no_improvement = 0
+            else:
+                no_improvement += 1
         # print statistics
         if epoch % 10 == 0:
             print(f"epoch: {epoch},\tloss: {(running_loss / j)},\tval_loss: {val_loss.item()},\tval_alt: {val_rmse.item()},\tno improvement since: {no_improvement}")
@@ -168,7 +176,6 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
     frules.write(";".join("&".join(str(v.item()) for v in row) for row in rules) + "\n")
     print('Finished Training')
     return best[0]
-
 
 
 if __name__ == "__main__":
