@@ -16,7 +16,7 @@ if __name__=="__main__":
     with open(sys.argv[1], "rb") as fin:
         features, labels, names = pickle.load(fin)
 
-    with open("../results/rules.txt", "r") as fin:
+    with open("results/rules.txt", "r") as fin:
         rulessets = []
         for line in fin:
             rules = []
