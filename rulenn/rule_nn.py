@@ -51,7 +51,7 @@ class LogicLayer(nn.Module):
 
 
 
-class CYK(nn.Module):
+class RuleNet(nn.Module):
 
     def __init__(self, num_variables, num_conjunctions, layers,config=None):
         assert layers > 0
@@ -72,8 +72,8 @@ class CYK(nn.Module):
         x = torch.concat((x0, 1 - x0), dim=1)
         x_exp = x.unsqueeze(1).expand((-1, self.num_conjunctions, -1))
         x_pot = (mu * x_exp) + (1 - mu) #torch.pow(x_exp, mu)
-        o = torch.prod(x_pot, dim=-1)
-        return 10 + torch.sum(self.rule_weights*o, dim=-1).squeeze(-1)
+        o = torch.min(x_pot, dim=-1)[0]
+        return 5 + torch.sum(self.rule_weights*o, dim=-1).squeeze(-1)
 
     def print_rules(self, variables):
         weights = self.non_lin(self.conjunctions)
@@ -109,7 +109,7 @@ def cross_val(patience, features, labels, variables):
 
 def main(epochs, features, labels, train_index, val_index, variables, frules, device):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
-    net = CYK(features.shape[1], 100, 3)
+    net = RuleNet(features.shape[1], 100, 3)
     net.to(device)
     criterion = nn.MSELoss()
     val_criterion = nn.L1Loss()
