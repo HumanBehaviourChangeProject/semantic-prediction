@@ -124,16 +124,13 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
     no_improvement = 0
     epoch = 0
     best = []
-    running_loss = 0.0
     j = 0
-    while epoch < 200 or no_improvement < 20:  # loop over the dataset multiple times
-
+    running_loss = 0.0
+    running_penalties = 0.0
+    while epoch < 200 or no_improvement < 50:  # loop over the dataset multiple times
         # get the inputs; data is a list of [inputs, labels]
-
-        # zero the parameter gradients
-
         # forward + backward + optimize
-        e = torch.sigmoid(torch.tensor(epoch/10-3, device=device))
+        e = torch.sigmoid(torch.tensor(epoch/25-6, device=device))
         batch_size = 10
         random.shuffle((train_index))
 
@@ -144,22 +141,23 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
             batch_labels = labels[batch_index].squeeze(-1)
             outputs = net(features[batch_index])
             w = net.non_lin(net.conjunctions)
-            loss = criterion(outputs, batch_labels)
-            loss += e*torch.sum(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
+            base_loss = criterion(outputs, batch_labels)
+            penalties = 2*e*torch.sum(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
             m = torch.max((torch.stack((torch.sum(w, dim=-1)-3, torch.zeros(w.shape[:-1])))), dim=0)
-            loss += 0.5*e*torch.sum(m[0], dim=0)# penalty for long rules
-            loss += 5*e*torch.sum(1-torch.max(w, dim=-1)[0], dim=0)# penalty for rules without ones
+            penalties += e*torch.sum(m[0], dim=0)# penalty for long rules
+            #penalties += 5*e*torch.sum(1-torch.max(w, dim=-1)[0], dim=0)# penalty for rules without ones
+            loss = base_loss + penalties
             loss.backward()
             optimizer.step()
-            running_loss += loss.item()
+            #print(net.conjunctions.grad)
+            running_loss += base_loss.detach().item()
+            running_penalties += penalties.detach().item()
             j += 1
 
         with torch.no_grad():
-            net.eval()
             val_out = net(features[val_index])
             val_loss = criterion(val_out, labels[val_index].squeeze(-1))
             val_rmse = val_criterion(val_out, labels[val_index].squeeze(-1))**0.5
-            net.train()
 
         if epoch > 300:
             if not best or val_loss - best[-1][0] < -0.05:
@@ -172,8 +170,9 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
                 no_improvement += 1
         # print statistics
         if epoch % 10 == 0:
-            print(f"epoch: {epoch},\tloss: {(running_loss / j)},\tval_loss: {val_loss.item()},\tval_alt: {val_rmse.item()},\tno improvement since: {no_improvement}")
+            print(f"epoch: {epoch},\tloss: {(running_loss / j)},penalties: {(running_penalties / j)},\tval_loss: {val_loss.item()},\tval_alt: {val_rmse.item()},\tno improvement since: {no_improvement}")
             running_loss = 0.0
+            running_penalties = 0.0
             j = 0
         epoch += 1
     best_model = best[0][1]
