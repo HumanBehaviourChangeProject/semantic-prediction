@@ -55,7 +55,7 @@ FUZZY_SETS = {"Mean age": {"child": FuzzySet(0, 0, 14, 18),
                 "many more": FuzzySet(75, 80, 90, 95),
                 "all": FuzzySet(90, 95, 100, 100),
               }
-          }Dear
+          }
 
 if __name__ == "__main__":
     sns.set(rc={'figure.figsize': (20, 4)})

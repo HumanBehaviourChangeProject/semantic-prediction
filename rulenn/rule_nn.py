@@ -67,13 +67,18 @@ class RuleNet(nn.Module):
         self.non_lin = nn.Sigmoid()
         self.dropout = nn.Dropout(0.1)
 
-    def forward(self, x0):
+    def calculate_fit(self, x0):
         mu = self.non_lin(self.conjunctions)
         x = torch.concat((x0, 1 - x0), dim=1)
         x_exp = x.unsqueeze(1).expand((-1, self.num_conjunctions, -1))
         x_pot = (mu * x_exp) + (1 - mu) #torch.pow(x_exp, mu)
-        o = torch.min(x_pot, dim=-1)[0]
-        return 5 + torch.sum(self.rule_weights*o, dim=-1).squeeze(-1)
+        return torch.min(x_pot, dim=-1)[0]
+
+    def forward(self, x0):
+        return self.apply_fit(self.calculate_fit(x0))
+
+    def apply_fit(self, fit):
+        return 5 + torch.sum(self.rule_weights * fit, dim=-1).squeeze(-1)
 
     def print_rules(self, variables):
         weights = self.non_lin(self.conjunctions)
