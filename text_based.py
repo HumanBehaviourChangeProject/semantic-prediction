@@ -24,11 +24,11 @@ class FeaturePrediction(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
         self.biobert = AutoModel.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
-        self.output = nn.Sequential(nn.Linear(46, 512), nn.ReLU(), nn.Linear(512, n_classes))
+        self.output = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, n_classes))
 
     def forward(self, data):
         a = self.biobert(data)
-        return self.output(a.logits)
+        return self.output(a.pooler_output)
 
 def get_features():
     with open("data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
