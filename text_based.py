@@ -94,7 +94,7 @@ def main(epochs, features, train_index, val_index, labels, device):
     no_improvement = 0
     epoch = 0
 
-    inputs = [[torch.tensor(x, device=device) for x in tokenizer(list(y[1])).input_ids] for y in features]
+    inputs = [pad_sequence([torch.tensor(x[:511], device=device) for x in tokenizer(list(y[1])).input_ids]).T for y in features]
     targed = torch.tensor(labels.iloc[:,1:].values, device=device).float()
     val_loss = None
 
@@ -113,7 +113,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         for i in progress:
             optimizer.zero_grad()
             batch_index = train_index[i]
-            outputs = torch.max(torch.cat([net(sentence[:511].unsqueeze(0)) for sentence in inputs[i]]), dim=0).values
+            outputs = torch.max(net(inputs[i]))
             loss = criterion(outputs, targed[batch_index])
             running_loss += loss.item()
             j += 1
