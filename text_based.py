@@ -69,6 +69,7 @@ def cross_val(patience, device):
         train_index = [c for j in range(len(chunks)) for c in chunks[j] if i != j ]
         val_index = chunks[i]
         best = main(patience, list(texts.items()), train_index, val_index, features.astype(float), device)
+        torch.save(best[1], "/tmp/text-hbcp.pt")
 
 def get_texts():
     with open("data/All_annotations_512papers_05March20.json", "r") as fin:
@@ -87,7 +88,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         "dmis-lab/biobert-base-cased-v1.2")
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(net.parameters(), lr=1e-4)
+    optimizer = optim.Adam(net.parameters(), lr=1e-3)
     best = []
     keep_top = 5
     no_improvement = 0
