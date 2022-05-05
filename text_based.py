@@ -113,7 +113,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         for i in progress:
             optimizer.zero_grad()
             batch_index = train_index[i]
-            outputs = torch.max(net(inputs[i]))
+            outputs = torch.max(net(inputs[batch_index]))
             loss = criterion(outputs, targed[batch_index])
             running_loss += loss.item()
             j += 1
