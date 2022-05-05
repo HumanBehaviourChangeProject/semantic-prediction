@@ -23,7 +23,7 @@ def is_number(x):
 class FeaturePrediction(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
-        self.biobert = BertForSequenceClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
+        self.biobert = AutoModel.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
         self.output = nn.Sequential(nn.Linear(46, 512), nn.ReLU(), nn.Linear(512, n_classes))
 
     def forward(self, data):
