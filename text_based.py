@@ -94,7 +94,7 @@ def main(epochs, features, train_index, val_index, labels, device):
     no_improvement = 0
     epoch = 0
 
-    inputs = [pad_sequence([torch.tensor(x[:511], device=device) for x in tokenizer(list(y[1])).input_ids]).T for y in features]
+    inputs = [[torch.tensor(x[:511], device=device) for x in tokenizer(list(y[1])).input_ids] for y in features]
     targed = torch.tensor(labels.iloc[:,1:].values, device=device).float()
     val_loss = None
 
@@ -113,7 +113,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         for i in progress:
             optimizer.zero_grad()
             batch_index = train_index[i]
-            outputs = torch.max(net(inputs[batch_index]))
+            outputs = torch.max(torch.cat([net(sentence.unsqueeze(0)) for sentence in inputs[batch_index]],dim=0),dim=0).values
             loss = criterion(outputs, targed[batch_index])
             running_loss += loss.item()
             j += 1
@@ -124,9 +124,10 @@ def main(epochs, features, train_index, val_index, labels, device):
         with torch.no_grad():
             val_loss_sum = 0
             for i in list(val_index):
-                outputs = torch.max(torch.cat([net(sentence[:511].unsqueeze(0)) for sentence in inputs[i]]), dim=0).values
-                val_loss_sum += criterion(outputs, targed[i]).item()
-                diffs.append((outputs-targed[i]).detach().cpu())
+                batch_index = val_index[i]
+                outputs = torch.max(torch.cat([net(sentence) for sentence in inputs[batch_index]]), dim=0).values
+                val_loss_sum += criterion(outputs, targed[batch_index]).item()
+                diffs.append((outputs-targed[batch_index]).detach().cpu())
             val_loss = val_loss_sum/len(val_index)
 
 
