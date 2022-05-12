@@ -1,10 +1,12 @@
-
-
 def use_rounded(ident, data):
     v = None
     if ident in data:
         for i in reversed(range(0, 3)):
-            s = set(round(float(x), i) for x, _ in data[ident] if _clean(x) not in ("no", "none") and is_number(x))
+            s = set(
+                round(float(x), i)
+                for x, _ in data[ident]
+                if _clean(x) not in ("no", "none") and is_number(x)
+            )
             if len(s) == 1:
                 return {ident: s.pop()}
     if v:
@@ -26,7 +28,9 @@ def _clean(x):
     return x.replace(",", "").replace(";", "").replace("-", "").replace(" ", "").lower()
 
 
-def _process_with_key_list(ident, keys, data, initial_dictionary=None, threshold=90, negative=False):
+def _process_with_key_list(
+    ident, keys, data, initial_dictionary=None, threshold=90, negative=False
+):
     if initial_dictionary:
         d = dict(initial_dictionary)
     else:
@@ -76,11 +80,21 @@ def process_distance(ident, data):
 
 
 def process_somatic(ident, data):
-    keys = {"gum": ["gum", "polacrilex"], "lozenge": ["lozenge"], "e_cigarette": ["ecig", "ecigarette"],
-            "inhaler": ["inhaler", "inhal"], "placebo": ["placebo"],
-            "varenicline": ["varenicline", "varen", "chantix", "champix"], "nasal_spray": ["nasal"],
-            "rimonabant": ["rimonab"], "nrt": ["nicotine", "nrt"], "bupropion": ["bupropion"]}
-    d = dict(gum=0, lozenge=0, e_cigarette=0, inhaler=0, placebo=0, nasal_spray=0, nrt=0)
+    keys = {
+        "gum": ["gum", "polacrilex"],
+        "lozenge": ["lozenge"],
+        "e_cigarette": ["ecig", "ecigarette"],
+        "inhaler": ["inhaler", "inhal"],
+        "placebo": ["placebo"],
+        "varenicline": ["varenicline", "varen", "chantix", "champix"],
+        "nasal_spray": ["nasal"],
+        "rimonabant": ["rimonab"],
+        "nrt": ["nicotine", "nrt"],
+        "bupropion": ["bupropion"],
+    }
+    d = dict(
+        gum=0, lozenge=0, e_cigarette=0, inhaler=0, placebo=0, nasal_spray=0, nrt=0
+    )
     d.update(any_as_presence(ident, data))
     d = _process_with_key_list(ident, keys, data, initial_dictionary=d)
     patch = any_as_presence(6080694, data)[6080694]
@@ -90,10 +104,19 @@ def process_somatic(ident, data):
 
 
 def process_pill(ident, data):
-    keys = {"bupropion": (
-    ["bupropion"], True, any(True for x, _ in data.get(6080693, tuple()) if _clean(x) in ["bupropion"])),
-            "nortriptyline": (["nortript"], True, False),
-            "varenicline": (["varenicline", "varen", "chantix", "champix"], True, False)}
+    keys = {
+        "bupropion": (
+            ["bupropion"],
+            True,
+            any(
+                True
+                for x, _ in data.get(6080693, tuple())
+                if _clean(x) in ["bupropion"]
+            ),
+        ),
+        "nortriptyline": (["nortript"], True, False),
+        "varenicline": (["varenicline", "varen", "chantix", "champix"], True, False),
+    }
     d = any_as_presence(ident, data)
     for x, _ in data.get(ident, tuple()):
         for key, (patterns, ands, ors) in keys.items():
@@ -104,9 +127,20 @@ def process_pill(ident, data):
 
 
 def process_health_professional(ident, data):
-    keys = {"nurse": ["nurse"],
-            "doctor": ["physician", "doctor", "physician", "cardiologist", "pediatrician", "general pract", "GP",
-                       "resident", "internal medicine"]}
+    keys = {
+        "nurse": ["nurse"],
+        "doctor": [
+            "physician",
+            "doctor",
+            "physician",
+            "cardiologist",
+            "pediatrician",
+            "general pract",
+            "GP",
+            "resident",
+            "internal medicine",
+        ],
+    }
     d = any_as_presence(ident, data)
     d = _process_with_key_list(ident, keys, data, initial_dictionary=d)
     return d
@@ -127,9 +161,15 @@ def process_aggregate_patient_role(ident, data):
 
 def process_healthcare_facility(ident, data):
     keys = {"healthcare facility": ["smok"]}
-    d = _process_with_key_list(ident, keys, data,
-                               initial_dictionary={"healthcare facility": 1 if data.get(ident, tuple()) else 0},
-                               negative=True)
+    d = _process_with_key_list(
+        ident,
+        keys,
+        data,
+        initial_dictionary={
+            "healthcare facility": 1 if data.get(ident, tuple()) else 0
+        },
+        negative=True,
+    )
     return d
 
 
@@ -145,7 +185,9 @@ def is_number(x):
 
 def process_proportion_female(ident, data):
     value = None
-    females = use_rounded(ident, {ident: {x for x in data.get(ident, set()) if is_number(x[0])}}).get(ident, None)
+    females = use_rounded(
+        ident, {ident: {x for x in data.get(ident, set()) if is_number(x[0])}}
+    ).get(ident, None)
     if females:
         value = females
     else:
@@ -159,7 +201,10 @@ def process_proportion_female(ident, data):
 
 
 def process_pharmacological_interest(ident, data):
-    return {ident: any_as_presence(ident, data).get(ident, 0) or any_as_presence(6830264, data).get(6830264, 0)}
+    return {
+        ident: any_as_presence(ident, data).get(ident, 0)
+        or any_as_presence(6830264, data).get(6830264, 0)
+    }
 
 
 def build_process_country():
@@ -172,7 +217,9 @@ def build_process_country():
             if len(countries_values) > 1:
                 value = "multinational"
             else:
-                match, quality = fw_process.extract(countries_values[0], countries, scorer=fuzz.ratio)[0]
+                match, quality = fw_process.extract(
+                    countries_values[0], countries, scorer=fuzz.ratio
+                )[0]
                 if quality > 80:
                     value = match
                 else:
@@ -196,9 +243,18 @@ mappings = {
     6451788: any_as_presence,
     6823485: any_as_presence,
     6823487: process_motivational_interviewing,
-    6452745: any_as_presence, 6452746: any_as_presence, 6452748: any_as_presence, 6452756: any_as_presence,
-    6452757: any_as_presence, 6452838: any_as_presence, 6452840: any_as_presence, 6452948: any_as_presence,
-    6452949: any_as_presence, 6452763: any_as_presence, 6452831: any_as_presence, 6452836: any_as_presence,
+    6452745: any_as_presence,
+    6452746: any_as_presence,
+    6452748: any_as_presence,
+    6452756: any_as_presence,
+    6452757: any_as_presence,
+    6452838: any_as_presence,
+    6452840: any_as_presence,
+    6452948: any_as_presence,
+    6452949: any_as_presence,
+    6452763: any_as_presence,
+    6452831: any_as_presence,
+    6452836: any_as_presence,
     6080701: any_as_presence,
     6080686: any_as_presence,
     6080687: process_distance,
