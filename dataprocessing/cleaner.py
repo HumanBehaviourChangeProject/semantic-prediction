@@ -1,3 +1,69 @@
+import csv
+from thefuzz import process as fw_process, fuzz
+
+COMBINED_TIME_POINT_ID = 0
+
+ATTRIBUTES_TO_CLEAN = (
+        6451791,
+        0,
+        6451788,
+        6823485,
+        6823487,
+        "brief advise",
+        6452745,
+        6452746,
+        6452748,
+        6452756,
+        6452757,
+        6452763,
+        6452831,
+        6452836,
+        6452838,
+        6452840,
+        6452948,
+        6452949,
+        6080701,
+        6080686,
+        "phone",
+        6080692,
+        6080694,
+        6080693,
+        "gum",
+        "e_cigarette",
+        "inhaler",
+        "lozenge",
+        "nasal_spray",
+        "placebo",
+        "nrt",
+        6080695,
+        "bupropion",
+        "varenicline",
+        6080688,
+        6080691,
+        "text messaging",
+        6080704,
+        "doctor",
+        "nurse",
+        "pychologist",
+        "aggregate patient role",
+        6080481,
+        6080485,
+        6080512,
+        6080518,
+        "healthcare facility",
+        6830264,
+        6830268,
+        6080719,
+    )
+
+def load_countries_and_cities():
+    with open("data/worldcities.csv", "r") as fin:
+        reader = csv.reader(fin)
+        header = next(reader)
+        city_dict = {line[1]: line[4] for line in reader}
+
+    return set(city_dict.values()).union({"USA", "UK", "England"}), city_dict
+
 def use_rounded(ident, data):
     v = None
     if ident in data:
@@ -276,3 +342,57 @@ mappings = {
     6830268: process_pharmacological_interest,
     6080719: use_rounded,
 }
+
+
+def clean_attributes(doc_attrs, attributes_to_clean):
+    cleaned = dict()
+
+    doc_name_map = dict()
+    arm_name_map = dict()
+    for doc, arms in sorted(doc_attrs.items()):
+        doc_name, doc_id = doc.split("___")
+        doc_name_map[doc_id] = doc_name
+        for arm, arm_attributes in arms.items():
+            arm_name, arm_id = arm.split("___")
+            arm_name_map[arm_id] = arm_name
+            values = {
+                "bupropion": 0,
+                "varenicline": 0,
+                "pychologist": 0,
+                "doctor": 0,
+                "nurse": 0,
+            }
+            combined_time_point = arm_attributes.get(6451782) or arm_attributes.get(
+                6451773
+            )
+            if combined_time_point:
+                arm_attributes[COMBINED_TIME_POINT_ID] = combined_time_point
+            for attribute_id, mapping in mappings.items():
+                mapped = mapping(attribute_id, arm_attributes)
+                mapped_with_context = {k: mapped.get(k, 0) for k in mapped}
+                values.update(mapped_with_context)
+            try:
+                doc_arms = cleaned[doc_id]
+            except KeyError:
+                cleaned[doc_id] = doc_arms = dict()
+            doc_arms[arm_id] = values
+
+    actual_cleaned_attributes = list(
+        sorted(
+            {
+                attribute_id
+                for doc_id, arms in cleaned.items()
+                for arm_id, attributes in arms.items()
+                for attribute_id in attributes
+            },
+            key=str,
+        )
+    )
+    diff = (
+        set(actual_cleaned_attributes)
+        .difference(attributes_to_clean)
+        .union(set(attributes_to_clean).difference(actual_cleaned_attributes))
+    )
+    assert not diff, diff
+
+    return cleaned, doc_name_map, arm_name_map

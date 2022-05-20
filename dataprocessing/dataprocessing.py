@@ -1,19 +1,17 @@
 import json
 import csv
 import pickle
-import random
 
-import numpy
 import pandas
 import pandas as pd
 import xlsxwriter
-from thefuzz import process as fw_process, fuzz
+from thefuzz import fuzz
 from skfuzzy import cluster as fc
 import numpy as np
 import re
 from fuzzysets import FUZZY_SETS
 
-COMBINED_TIME_POINT_ID = 0
+from cleaning import is_number, clean_attributes, COMBINED_TIME_POINT_ID
 
 NUMERIC_ATTRIBUTES = (
     4099754,
@@ -37,59 +35,6 @@ NUMERIC_ATTRIBUTES = (
     6823480,
     6823482,
 )
-
-
-def load_countries_and_cities():
-    with open("data/worldcities.csv", "r") as fin:
-        reader = csv.reader(fin)
-        header = next(reader)
-        city_dict = {line[1]: line[4] for line in reader}
-
-    return set(city_dict.values()).union({"USA", "UK", "England"}), city_dict
-
-
-def rec_attr(cs):
-    for attr in cs["Attributes"]["AttributesList"]:
-        yield attr["AttributeId"]
-        if "Attributes" in attr:
-            for r in rec_attr(attr):
-                yield r
-
-
-def load_prio():
-    with open("data/prio.txt", "r") as fin:
-        prio_names = [l.replace("\n", "") for l in fin]
-
-    with open(
-        "data/All_annotations_512papers_05March20.json",
-        "r",
-    ) as fin:
-        d = json.load(fin)
-        for cs in d["CodeSets"]:
-            if cs["SetName"] == "New Prioritised Codeset":
-                prio = set(rec_attr(cs))
-
-    return prio, prio_names
-
-
-def load_id_map(init=None):
-    if init is None:
-        id_map = dict()
-    else:
-        id_map = init
-
-    with open(
-        "data/EntityMapping_27May21.csv",
-        "r",
-    ) as fin:
-        r = csv.reader(fin)
-        header = next(r)
-        for line in r:
-            d = dict(zip(header, line))
-            if d["Smoking"] != "N/A" and d["Old Codeset"] != "N/A":
-                id_map[int(d["Old Codeset"])] = int(d["Smoking"])
-    return id_map
-
 
 def parse_int(textnum, numwords={}):
     # create our default word-lists
@@ -288,85 +233,6 @@ def write_attribute_values(attributes, doc_attrs, prio, id_map, id_map_reverse):
             row_counter += 1
 
     workbook.close()
-
-
-def clean_attributes(doc_attrs, attributes_to_clean):
-    cleaned = dict()
-
-    doc_name_map = dict()
-    arm_name_map = dict()
-    for doc, arms in sorted(doc_attrs.items()):
-        doc_name, doc_id = doc.split("___")
-        doc_name_map[doc_id] = doc_name
-        for arm, arm_attributes in arms.items():
-            arm_name, arm_id = arm.split("___")
-            arm_name_map[arm_id] = arm_name
-            values = {
-                "bupropion": 0,
-                "varenicline": 0,
-                "pychologist": 0,
-                "doctor": 0,
-                "nurse": 0,
-            }
-            combined_time_point = arm_attributes.get(6451782) or arm_attributes.get(
-                6451773
-            )
-            if combined_time_point:
-                arm_attributes[COMBINED_TIME_POINT_ID] = combined_time_point
-            for attribute_id, mapping in mappings.items():
-                mapped = mapping(attribute_id, arm_attributes)
-                mapped_with_context = {k: mapped.get(k, 0) for k in mapped}
-                values.update(mapped_with_context)
-            try:
-                doc_arms = cleaned[doc_id]
-            except KeyError:
-                cleaned[doc_id] = doc_arms = dict()
-            doc_arms[arm_id] = values
-
-    actual_cleaned_attributes = list(
-        sorted(
-            {
-                attribute_id
-                for doc_id, arms in cleaned.items()
-                for arm_id, attributes in arms.items()
-                for attribute_id in attributes
-            },
-            key=str,
-        )
-    )
-    diff = (
-        set(actual_cleaned_attributes)
-        .difference(attributes_to_clean)
-        .union(set(attributes_to_clean).difference(actual_cleaned_attributes))
-    )
-    assert not diff, diff
-
-    return cleaned, doc_name_map, arm_name_map
-
-
-def write_cleaned_attributes(cleaned, attributes_to_clean, doc_name_map, arm_name_map):
-    with open("/tmp/cleaned_attributes.csv", "w") as fout:
-        writer = csv.writer(fout)
-        writer.writerow(
-            ["document", "document_id", "arm", "arm_id"]
-            + [b for a in attributes_to_clean for b in [attributes_to_clean.get(a, a)]]
-        )
-        # writer.writerow(["", ""] + [b for a in cleaned_attributes for b in [a]])
-        for doc_id, arms in cleaned.items():
-            for arm_id, arm in arms.items():
-                writer.writerow(
-                    [doc_name_map[doc_id], doc_id, arm_name_map[arm_id], arm_id]
-                    + [
-                        x
-                        for attribute_id in attributes_to_clean
-                        for vals in (arm.get(attribute_id, "-"),)
-                        for x in [vals]
-                    ]
-                )
-
-    with open("/tmp/cleaned_attributes.json", "w") as fout:
-        json.dump(cleaned, fout, indent=2)
-
 
 def write_bct_contexts(attributes, cleaned, doc_attrs, doc_name_map, arm_name_map):
     bcts = (
@@ -718,68 +584,17 @@ def default_feature_extraction(doc_attrs, arm_name_map):
         column_names,
     )
 
+def load_attributes_from_json():
+    id_map = load_id_map(init={COMBINED_TIME_POINT_ID: COMBINED_TIME_POINT_ID})
+    id_map_reverse = dict(map(reversed, id_map.items()))
+    prio, prio_names = load_prio()
+    print("Load attributes")
+    attributes, doc_attrs = load_attributes(prio_names, id_map)
+    # print("Clean attributes")
+    cleaned, doc_name_map, arm_name_map = clean_attributes(doc_attrs)
+    return cleaned
 
 def main():
-    # id_map = load_id_map(init={COMBINED_TIME_POINT_ID: COMBINED_TIME_POINT_ID})
-    # id_map_reverse = dict(map(reversed, id_map.items()))
-    # prio, prio_names = load_prio()
-    print("Load attributes")
-    # attributes, doc_attrs = load_attributes(prio_names, id_map)
-
-    attributes_to_clean = (
-        6451791,
-        0,
-        6451788,
-        6823485,
-        6823487,
-        "brief advise",
-        6452745,
-        6452746,
-        6452748,
-        6452756,
-        6452757,
-        6452763,
-        6452831,
-        6452836,
-        6452838,
-        6452840,
-        6452948,
-        6452949,
-        6080701,
-        6080686,
-        "phone",
-        6080692,
-        6080694,
-        6080693,
-        "gum",
-        "e_cigarette",
-        "inhaler",
-        "lozenge",
-        "nasal_spray",
-        "placebo",
-        "nrt",
-        6080695,
-        "bupropion",
-        "varenicline",
-        6080688,
-        6080691,
-        "text messaging",
-        6080704,
-        "doctor",
-        "nurse",
-        "pychologist",
-        "aggregate patient role",
-        6080481,
-        6080485,
-        6080512,
-        6080518,
-        "healthcare facility",
-        6830264,
-        6830268,
-        6080719,
-    )
-    # print("Clean attributes")
-    # cleaned, doc_name_map, arm_name_map = clean_attributes(doc_attrs, attributes_to_clean)
     print("Build fuzzy dataset")
     cleaned_removed, arm_name_map = load_deleted()
     # write_csv(cleaned_removed, attributes)
