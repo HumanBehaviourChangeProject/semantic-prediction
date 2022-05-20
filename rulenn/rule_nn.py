@@ -127,10 +127,16 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
     j = 0
     running_loss = 0.0
     running_penalties = 0.0
+    d = torch.diag(torch.ones((features.shape[1],), requires_grad=False))
+    z = torch.zeros(features.shape[1],features.shape[1], requires_grad=False)
+    pos = torch.cat([d,z])
+    neg = torch.cat([z, d])
+    negation_filter = torch.cat([d, d], dim=-1)
+
     while epoch < 200 or no_improvement < 50:  # loop over the dataset multiple times
         # get the inputs; data is a list of [inputs, labels]
         # forward + backward + optimize
-        e = torch.sigmoid(torch.tensor(epoch/25-6, device=device))
+        e = torch.sigmoid(torch.tensor(epoch/25-6, device=device, requires_grad=False))
         batch_size = 10
         random.shuffle((train_index))
 
@@ -142,10 +148,14 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
             outputs = net(features[batch_index])
             w = net.non_lin(net.conjunctions)
             base_loss = criterion(outputs, batch_labels)
-            penalties = 2*e*torch.sum(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
-            m = torch.max((torch.stack((torch.sum(w, dim=-1)-3, torch.zeros(w.shape[:-1])))), dim=0)
-            penalties += e*torch.sum(m[0], dim=0)# penalty for long rules
-            #penalties += 5*e*torch.sum(1-torch.max(w, dim=-1)[0], dim=0)# penalty for rules without ones
+            non_crips_penalty = 2*torch.sum(torch.sum(w*(1-w), dim=-1), dim=0) # penalty for non-crisp rules
+            m = torch.max(torch.stack((torch.sum(w, dim=-1)-3, torch.zeros(w.shape[:-1]))), dim=0)
+            long_rules_penalty = torch.sum(m[0], dim=0)# penalty for long rules
+
+            contradiction_penalty = 0.5*torch.sum(torch.sum(torch.matmul(w, pos) * torch.matmul(w, neg), dim=-1), dim=-1)
+
+            penalties = e*(non_crips_penalty + long_rules_penalty + contradiction_penalty)
+
             loss = base_loss + penalties
             loss.backward()
             optimizer.step()
