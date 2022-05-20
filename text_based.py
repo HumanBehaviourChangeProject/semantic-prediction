@@ -23,12 +23,12 @@ def is_number(x):
 class FeaturePrediction(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
-        self.biobert = BertForSequenceClassification.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
-        #self.output = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, n_classes))
+        self.biobert = AutoModel.from_pretrained("dmis-lab/biobert-base-cased-v1.2", num_labels=n_classes)
+        self.output = nn.Sequential(nn.Linear(768, 512), nn.ReLU(), nn.Linear(512, n_classes))
 
     def forward(self, data):
         a = self.biobert(data)
-        return a.logits #self.output(a.logits)
+        return self.output(a.pooler_output)
 
 def get_features():
     with open("data/cleaned_dataset_13Feb2022_notes_removed_control-2.csv") as fin:
@@ -69,6 +69,7 @@ def cross_val(patience, device):
         train_index = [c for j in range(len(chunks)) for c in chunks[j] if i != j ]
         val_index = chunks[i]
         best = main(patience, list(texts.items()), train_index, val_index, features.astype(float), device)
+        torch.save(best[1], "/tmp/text-hbcp.pt")
 
 def get_texts():
     with open("data/All_annotations_512papers_05March20.json", "r") as fin:
@@ -87,13 +88,13 @@ def main(epochs, features, train_index, val_index, labels, device):
         "dmis-lab/biobert-base-cased-v1.2")
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(net.parameters(), lr=1e-4)
+    optimizer = optim.Adam(net.parameters(), lr=1e-3)
     best = []
     keep_top = 5
     no_improvement = 0
     epoch = 0
 
-    inputs = [[torch.tensor(x, device=device) for x in tokenizer(list(y[1])).input_ids] for y in features]
+    inputs = [[torch.tensor(x[:511], device=device) for x in tokenizer(list(y[1])).input_ids] for y in features]
     targed = torch.tensor(labels.iloc[:,1:].values, device=device).float()
     val_loss = None
 
@@ -112,7 +113,7 @@ def main(epochs, features, train_index, val_index, labels, device):
         for i in progress:
             optimizer.zero_grad()
             batch_index = train_index[i]
-            outputs = torch.max(torch.cat([net(sentence[:511].unsqueeze(0)) for sentence in inputs[i]]), dim=0).values
+            outputs = torch.max(torch.cat([net(sentence.unsqueeze(0)) for sentence in inputs[batch_index]],dim=0),dim=0).values
             loss = criterion(outputs, targed[batch_index])
             running_loss += loss.item()
             j += 1
@@ -123,9 +124,10 @@ def main(epochs, features, train_index, val_index, labels, device):
         with torch.no_grad():
             val_loss_sum = 0
             for i in list(val_index):
-                outputs = torch.max(torch.cat([net(sentence[:511].unsqueeze(0)) for sentence in inputs[i]]), dim=0).values
-                val_loss_sum += criterion(outputs, targed[i]).item()
-                diffs.append((outputs-targed[i]).detach().cpu())
+                batch_index = val_index[i]
+                outputs = torch.max(torch.cat([net(sentence) for sentence in inputs[batch_index]]), dim=0).values
+                val_loss_sum += criterion(outputs, targed[batch_index]).item()
+                diffs.append((outputs-targed[batch_index]).detach().cpu())
             val_loss = val_loss_sum/len(val_index)
 
 
