@@ -16,41 +16,6 @@ from torch import autograd
 import copy
 import numpy as np
 
-
-def and_(x, y):
-    return x * y
-
-
-
-def or_(x, y):
-    return x + y - x*y
-
-
-def not_(x):
-    return 1 - x
-
-
-def ident(x):
-    return x
-
-
-def p1(x, y):
-    return x
-
-
-def p2(x, y):
-    return y
-
-class LogicLayer(nn.Module):
-    def __init__(self, in_dim, rules_per_layer):
-        super().__init__()
-        self.filters = nn.ModuleList([LogicGate(in_dim) for r in range(rules_per_layer)])
-
-    def forward(self, x):
-        return torch.stack([f(x) for f in self.filters], dim=1)
-
-
-
 class RuleNet(nn.Module):
 
     def __init__(self, num_variables, num_conjunctions, layers,config=None):
@@ -84,6 +49,7 @@ class RuleNet(nn.Module):
         weights = self.non_lin(self.conjunctions)
         for i in sorted(range(self.conjunctions.shape[0]), key=lambda  i:self.rule_weights[i]):
             yield " & ".join(v for v, c in zip(variables + [f"not {v}" for v in variables], weights[i]) if c > 0.5) + " => " + str(self.rule_weights[i].item())
+
 
 def cross_val(patience, features, labels, variables):
     if torch.cuda.is_available():
