@@ -8,6 +8,9 @@ class FuzzySet:
     def __call__(self, x):
         raise NotImplementedError
 
+    def plot(self, canvas, label):
+        raise NotImplementedError
+
 
 class TrapezoidFuzzySet(FuzzySet):
     def __init__(self, l0, l, r, r0):
@@ -28,6 +31,19 @@ class TrapezoidFuzzySet(FuzzySet):
         else:
             return 0
 
+    def plot(self, canvas, label):
+        if self.l0 == self.l:
+            if fs.r0 == fs.r:
+                sns.lineplot(x=[self.l, self.r], y=[1, 1], label=label)
+            else:
+                sns.lineplot(x=[self.l, self.r, self.r0], y=[1, 1, 0],
+                             label=label)
+        elif fs.r0 == fs.r:
+            sns.lineplot(x=[self.l0, self.l, self.r], y=[0, 1, 1], label=label)
+        else:
+            sns.lineplot(x=[self.l0, self.l, self.r, self.r0], y=[0, 1, 1, 0],
+                         label=label)
+
 
 class OpenTrapezoidFuzzySet(FuzzySet):
     def __init__(self, r, r0):
@@ -35,13 +51,28 @@ class OpenTrapezoidFuzzySet(FuzzySet):
         self.r = r
 
     def __call__(self, v):
-        if v > self.r0:
+
+        r = self.r
+        r0 = self.r0
+
+        if v > r0:
             return 0
-        elif v > self.r:
-            return (v - self.r0) / (self.r - self.r0)
+        elif v > r:
+            return (v - r0) / (r - r0)
         else:
             return 1
 
+    def plot(self, canvas, label):
+        if self.r0 == self.r:
+            sns.lineplot(x=[0, self.r], y=[1, 1], label=label)
+        else:
+            sns.lineplot(x=[0, self.r, self.r0], y=[1, 1, 0],
+                         label=label)
+
+class Verum(TrapezoidFuzzySet):
+
+    def __init__(self, l,r):
+        super().__init__(l,l,r,r)
 
 class RadialFuzzySet(FuzzySet):
     def __init__(self, centers, index):
@@ -49,8 +80,17 @@ class RadialFuzzySet(FuzzySet):
         self.index = index
 
     def __call__(self, v):
-        p = cmeans_predict(np.array([[v]]), self.c, 2, error=0.005, maxiter=10)[0]
-        return p[self.index, 0]
+        self._call_wrapped([v])
+
+    def _call_wrapped(self, v):
+        p = cmeans_predict(np.array([v]), self.c, 2, error=0.005, maxiter=10)[0]
+        return p[self.index]
+
+    def plot(self, canvas, label):
+        x = np.arange(0,max(self.c)*1.5)
+        y=self._call_wrapped(x)
+        sns.lineplot(x=x, y=y, label=label)
+
 
 
 female_centers = np.array(
@@ -64,6 +104,7 @@ FUZZY_SETS = {
     "Mean age": {
         "child": OpenTrapezoidFuzzySet(14, 18),
         "adolecent": OpenTrapezoidFuzzySet(23, 27),
+        "young adult": OpenTrapezoidFuzzySet(35, 40),
         "adult": OpenTrapezoidFuzzySet(60, 65),
         "elderly": OpenTrapezoidFuzzySet(100, 100),
     },
@@ -74,7 +115,7 @@ FUZZY_SETS = {
         "8-15 month": OpenTrapezoidFuzzySet(15 * 4.35, 16 * 4.35),
         "16-20 months": OpenTrapezoidFuzzySet(20 * 4.35, 21 * 4.35),
         "21-28 months": OpenTrapezoidFuzzySet(28 * 4.35, 29 * 4.35),
-        "29 month+": OpenTrapezoidFuzzySet(120 * 4.35, 120 * 4.35),
+        "29 month+": Verum(0, 36 * 4.35),
     },
     "Mean number of times tobacco used": {
         "<5": OpenTrapezoidFuzzySet(5, 6),
@@ -82,16 +123,16 @@ FUZZY_SETS = {
         "11-15": OpenTrapezoidFuzzySet(15, 16),
         "16-20": OpenTrapezoidFuzzySet(20, 21),
         "21-25": OpenTrapezoidFuzzySet(25, 26),
-        ">26": OpenTrapezoidFuzzySet(100, 100),
+        ">26": Verum(0,30),
     },
     "Proportion identifying as female gender": {
-        "None": OpenTrapezoidFuzzySet(1, 1),
-        "~10": RadialFuzzySet(female_centers, 0),
-        "~25": RadialFuzzySet(female_centers, 1),
-        "~45": RadialFuzzySet(female_centers, 2),
-        "~55": RadialFuzzySet(female_centers, 3),
-        "~70": RadialFuzzySet(female_centers, 4),
-        "All": OpenTrapezoidFuzzySet(99, 99),
+        "None": OpenTrapezoidFuzzySet(0, 1),
+        "~10": OpenTrapezoidFuzzySet(15, 20),
+        "~25": OpenTrapezoidFuzzySet(35, 40),
+        "~45": OpenTrapezoidFuzzySet(45, 50),
+        "~55": OpenTrapezoidFuzzySet(60, 65),
+        "~70": OpenTrapezoidFuzzySet(99, 100),
+        "All": OpenTrapezoidFuzzySet(100, 100),
     },
     "Individual-level analysed": {
         "~100": RadialFuzzySet(individual_analysed, 0),
@@ -106,11 +147,6 @@ if __name__ == "__main__":
     sns.set(rc={"figure.figsize": (20, 4)})
     for key, sets in FUZZY_SETS.items():
         for label, fs in sets.items():
-            if fs.l0 == fs.l:
-                sns.lineplot(x=[fs.l, fs.r, fs.r0], y=[1, 1, 0], label=label)
-            elif fs.r0 == fs.r:
-                sns.lineplot(x=[fs.l0, fs.l, fs.r], y=[0, 1, 1], label=label)
-            else:
-                sns.lineplot(x=[fs.l0, fs.l, fs.r, fs.r0], y=[0, 1, 1, 0], label=label)
+            fs.plot(sns, label)
         plt.savefig(f"/tmp/plots/{key}.png")
         plt.close()

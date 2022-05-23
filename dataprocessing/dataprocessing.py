@@ -339,16 +339,19 @@ def get_extended_fuzzy_data(rename, features, labels):
         fltr = values.notnull()
         filtered = values[fltr].astype(float)
         if not np.max(filtered) <= 1:
-            fuzzy_sets = list(FUZZY_SETS[rename[dim]].items())
-            # n_def apply_fuzzy_setscentroids = 5
-            # exfl = np.expand_dims(filtered, axis=-1).T
-            # cntr, u, u0, d, jm, p, fpc = fc.cmeans(exfl, n_centroids, 2, error=0.005, maxiter=1000, init=None)
-            # u = u[np.squeeze(cntr, axis=-1).argsort()]
-            new_values = np.zeros((values.shape[0], len(fuzzy_sets)))
-            new_values[fltr] = np.array(
-                [[fs.at_least_in(v) for _, fs in fuzzy_sets] for v in filtered]
-            )
-            new_names = [f"{rename[dim]} ({x})" for x in (l for l, _ in fuzzy_sets)]
+            fs = FUZZY_SETS.get(rename[dim])
+            if fs is not None:
+                fuzzy_sets = list(fs.items())
+                new_values = np.zeros((values.shape[0], len(fuzzy_sets)))
+                new_values[fltr] = np.array(
+                    [[fs(v) for _, fs in fuzzy_sets] for v in filtered]
+                )
+                new_names = [f"{rename[dim]} ({x})" for x in (l for l, _ in fuzzy_sets)]
+            else:
+                n_centroids = 5
+                exfl = np.expand_dims(filtered, axis=-1).T
+                cntr, u, u0, d, jm, p, fpc = fc.cmeans(exfl, n_centroids, 2, error=0.005, maxiter=1000, init=None)
+                u = u[np.squeeze(cntr, axis=-1).argsort()]
         else:
             new_values = np.expand_dims(features.iloc[:, dim], axis=-1)
             new_names = [rename[dim]]
