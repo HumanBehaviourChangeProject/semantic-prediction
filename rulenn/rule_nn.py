@@ -15,16 +15,20 @@ import feature_config as fc
 
 class RuleNet(nn.Module):
 
-    def __init__(self, num_variables, num_conjunctions, layers,config=None):
+    def __init__(self, num_variables, num_conjunctions, layers,config=None, append=None):
         assert layers > 0
         super().__init__()
-        self.num_conjunctions = num_conjunctions
         if config is None:
-            self.conjunctions = nn.Parameter(1-2*torch.rand((num_conjunctions, 2*num_variables), requires_grad=True))
-            self.rule_weights = nn.Parameter(10-20*torch.rand((num_conjunctions, ), requires_grad=True))
+            conj = 1-2*torch.rand((num_conjunctions, 2*num_variables), requires_grad=True)
+            rw = 10-20*torch.rand((num_conjunctions, ), requires_grad=True)
+            if append is not None:
+                conj = torch.cat((conj, append[0]))
+                rw = torch.cat((rw, append[1]))
         else:
-            self.conjunctions = nn.Parameter(config["conjunctions"], requires_grad=True)
-            self.rule_weights = nn.Parameter(config["rule_weights"], requires_grad=True)
+            conj = config["conjunctions"]
+            rw = config["rule_weights"]
+        self.conjunctions = nn.Parameter(conj)
+        self.rule_weights = nn.Parameter(rw)
         #self.base = nn.Parameter(5 - 10 * torch.rand(1, requires_grad=True), )
         self.non_lin = nn.Sigmoid()
         self.dropout = nn.Dropout(0.1)
@@ -32,7 +36,7 @@ class RuleNet(nn.Module):
     def calculate_fit(self, x0):
         mu = self.non_lin(self.conjunctions)
         x = torch.concat((x0, 1 - x0), dim=1)
-        x_exp = x.unsqueeze(1).expand((-1, self.num_conjunctions, -1))
+        x_exp = x.unsqueeze(1).expand((-1, self.conjunctions.shape[0], -1))
         x_pot = (mu * x_exp) + (1 - mu) #torch.pow(x_exp, mu)
         return torch.min(x_pot, dim=-1)[0]
 
@@ -108,11 +112,14 @@ def calculate_pure_fit(w, fltr):
 
 def main(epochs, features, labels, train_index, val_index, variables, frules, device):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
-    net = RuleNet(features.shape[1], 100, 3)
+    pre = torch.tensor(np.linalg.lstsq(features.numpy(), labels[:, 0], rcond=None)[0],requires_grad=True)
+    conjs = torch.diag(10*torch.ones(len(pre)))
+    conjs = torch.cat((conjs, torch.zeros_like(conjs, requires_grad=True)), dim=-1)
+    net = RuleNet(features.shape[1], 26, 3, append=(conjs, pre))
     net.to(device)
     criterion = nn.MSELoss()
     val_criterion = nn.L1Loss()
-    optimizer = optim.Adam(net.parameters(), lr=1e-3)
+    optimizer = optim.Adam(net.parameters(), lr=1e-4)
     postfix = ""
     keep_top = 5
     no_improvement = 0
@@ -128,10 +135,11 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
     implication_filter = load_implication_filters(variables)
     disjoint_filter = load_implication_filters(variables)
 
+
     while epoch < 200 or no_improvement < 50:  # loop over the dataset multiple times
         # get the inputs; data is a list of [inputs, labels]
         # forward + backward + optimize
-        e = torch.sigmoid(torch.tensor(epoch/25-6, device=device, requires_grad=False))
+        e = 0.2*torch.sigmoid(torch.tensor(epoch/25-6, device=device, requires_grad=False))
         batch_size = 10
         random.shuffle((train_index))
 
