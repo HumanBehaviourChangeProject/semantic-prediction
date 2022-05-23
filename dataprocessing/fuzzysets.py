@@ -9,7 +9,9 @@ class FuzzySet:
         self.r = r
         self.r0 = r0
 
-    def __call__(self, v):
+
+
+    def contains(self, v):
         if v < self.l0:
             return 0
         elif v < self.l:
@@ -21,6 +23,13 @@ class FuzzySet:
         else:
             return 0
 
+    def at_least_in(self, v):
+        if v < self.l0:
+            return 0
+        elif v < self.l:
+            return (v - self.l0) / (self.l - self.l0)
+        else:
+            return 1
 
 FUZZY_SETS = {
     "Mean age": {

@@ -11,7 +11,8 @@ import numpy as np
 import re
 from fuzzysets import FUZZY_SETS
 
-from cleaning import is_number, clean_attributes, COMBINED_TIME_POINT_ID
+from cleaner import is_number, clean_attributes, COMBINED_TIME_POINT_ID
+from reader import JSONReader
 
 NUMERIC_ATTRIBUTES = (
     4099754,
@@ -345,7 +346,7 @@ def get_extended_fuzzy_data(rename, features, labels):
             # u = u[np.squeeze(cntr, axis=-1).argsort()]
             new_values = np.zeros((values.shape[0], len(fuzzy_sets)))
             new_values[fltr] = np.array(
-                [[fs(v) for _, fs in fuzzy_sets] for v in filtered]
+                [[fs.at_least_in(v) for _, fs in fuzzy_sets] for v in filtered]
             )
             new_names = [f"{rename[dim]} ({x})" for x in (l for l, _ in fuzzy_sets)]
         else:
@@ -585,9 +586,10 @@ def default_feature_extraction(doc_attrs, arm_name_map):
     )
 
 def load_attributes_from_json():
-    id_map = load_id_map(init={COMBINED_TIME_POINT_ID: COMBINED_TIME_POINT_ID})
+    json_reader = JSONReader()
+    id_map = json_reader.load_id_map(init={COMBINED_TIME_POINT_ID: COMBINED_TIME_POINT_ID})
     id_map_reverse = dict(map(reversed, id_map.items()))
-    prio, prio_names = load_prio()
+    prio, prio_names = json_reader.load_prio()
     print("Load attributes")
     attributes, doc_attrs = load_attributes(prio_names, id_map)
     # print("Clean attributes")

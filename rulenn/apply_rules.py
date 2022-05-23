@@ -69,6 +69,7 @@ if __name__=="__main__":
             df = pd.DataFrame(rules)
             df.columns = names + ["not "+n for n in names] + ["weight"]
             print_rules(df)
+            exit()
             print("---")
             config = dict(conjunctions=logit(torch.tensor(df.iloc[:,:-1].values)), rule_weights = torch.tensor(df.iloc[:,-1].values))
             model = RuleNet(len(names), len(rules), 1, config=config)

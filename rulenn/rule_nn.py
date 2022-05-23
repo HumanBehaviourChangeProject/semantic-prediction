@@ -1,20 +1,17 @@
 import random
 
-import torch
+
 from torch import nn
 
-from pathlib import Path
-import sys
 import torch
 from torch.nn import functional as nnf
 
 import torch.optim as optim
-from sklearn.model_selection import train_test_split
-import os
-import tqdm
-from torch import autograd
+
 import copy
 import numpy as np
+
+import feature_config as fc
 
 class RuleNet(nn.Module):
 
@@ -78,6 +75,37 @@ def cross_val(patience, features, labels, variables):
                     fout.flush()
                     exit()
 
+
+def load_disjoint_filters(names):
+    filters = []
+    z = torch.zeros(features.shape[1], requires_grad=False)
+    for (lh, rhs) in fc.features_disjoint.items():
+        for rh in rhs:
+            v = torch.zeros(features.shape[1], requires_grad=False)
+            v[names.index[lh]] = 1
+            v[names.index[rh]] = 1
+            filters.append(torch.cat((v,z)))
+            filters.append(torch.cat((z, v)))
+    return torch.stack(filters)
+
+
+
+def load_implication_filters(names):
+    filters = []
+    z = torch.zeros(features.shape[1], requires_grad=False)
+    for (lh, rhs) in fc.features_implied.items():
+        for rh in rhs:
+            v = torch.zeros(features.shape[1], requires_grad=False)
+            v[names.index(lh)] = 1
+            v[names.index(rh)] = 1
+            filters.append(torch.cat((v,z)))
+            filters.append(torch.cat((z, v)))
+    return torch.stack(filters)
+
+def calculate_pure_fit(w, fltr):
+    return torch.min(w.unsqueeze(1).repeat(1,fltr.shape[0],1)*fltr + (1-fltr), dim=-1)[0]
+
+
 def main(epochs, features, labels, train_index, val_index, variables, frules, device):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
     net = RuleNet(features.shape[1], 100, 3)
@@ -97,7 +125,8 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
     z = torch.zeros(features.shape[1],features.shape[1], requires_grad=False)
     pos = torch.cat([d,z])
     neg = torch.cat([z, d])
-    negation_filter = torch.cat([d, d], dim=-1)
+    implication_filter = load_implication_filters(variables)
+    disjoint_filter = load_implication_filters(variables)
 
     while epoch < 200 or no_improvement < 50:  # loop over the dataset multiple times
         # get the inputs; data is a list of [inputs, labels]
@@ -119,8 +148,10 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
             long_rules_penalty = torch.sum(m[0], dim=0)# penalty for long rules
 
             contradiction_penalty = 0.5*torch.sum(torch.sum(torch.matmul(w, pos) * torch.matmul(w, neg), dim=-1), dim=-1)
+            disjoint_penalty = 0.5*torch.mean(torch.sum(calculate_pure_fit(w, disjoint_filter), dim=-1), dim=-1)
+            implied_penalty = 0.5*torch.mean(torch.sum(calculate_pure_fit(w, implication_filter), dim=-1), dim=-1)
 
-            penalties = e*(non_crips_penalty + long_rules_penalty + contradiction_penalty)
+            penalties = e*(non_crips_penalty + long_rules_penalty + contradiction_penalty + disjoint_penalty + implied_penalty)
 
             loss = base_loss + penalties
             loss.backward()
