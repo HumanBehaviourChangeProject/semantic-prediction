@@ -2,9 +2,12 @@ import seaborn as sns
 from matplotlib import pyplot as plt
 from skfuzzy.cluster import cmeans_predict
 import numpy as np
+
+
 class FuzzySet:
     def __call__(self, x):
         raise NotImplementedError
+
 
 class TrapezoidFuzzySet(FuzzySet):
     def __init__(self, l0, l, r, r0):
@@ -25,6 +28,7 @@ class TrapezoidFuzzySet(FuzzySet):
         else:
             return 0
 
+
 class OpenTrapezoidFuzzySet(FuzzySet):
     def __init__(self, r, r0):
         self.r0 = r0
@@ -38,17 +42,23 @@ class OpenTrapezoidFuzzySet(FuzzySet):
         else:
             return 1
 
+
 class RadialFuzzySet(FuzzySet):
-        def __init__(self, centers, index):
-            self.c = centers
-            self.index = index
+    def __init__(self, centers, index):
+        self.c = centers
+        self.index = index
 
-        def __call__(self, v):
-            p = cmeans_predict(np.array([[v]]), self.c, 2, error=0.005, maxiter=10)[0]
-            return p[self.index,0]
+    def __call__(self, v):
+        p = cmeans_predict(np.array([[v]]), self.c, 2, error=0.005, maxiter=10)[0]
+        return p[self.index, 0]
 
-female_centers = np.array([[ 8.64393539], [26.83006829], [45.48100431], [56.32242189], [67.86115455]])
-individual_analysed = np.array([[104.48384197], [  537.95792884], [ 1233.74699616], [ 3393.28183401], [14055.32421329]])
+
+female_centers = np.array(
+    [[8.64393539], [26.83006829], [45.48100431], [56.32242189], [67.86115455]]
+)
+individual_analysed = np.array(
+    [[104.48384197], [537.95792884], [1233.74699616], [3393.28183401], [14055.32421329]]
+)
 
 FUZZY_SETS = {
     "Mean age": {
@@ -83,7 +93,7 @@ FUZZY_SETS = {
         "~70": RadialFuzzySet(female_centers, 4),
         "All": OpenTrapezoidFuzzySet(99, 99),
     },
-"Individual-level analysed": {
+    "Individual-level analysed": {
         "~100": RadialFuzzySet(individual_analysed, 0),
         "~500": RadialFuzzySet(individual_analysed, 1),
         "~1000": RadialFuzzySet(individual_analysed, 2),
