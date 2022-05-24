@@ -80,7 +80,7 @@ class RadialFuzzySet(FuzzySet):
         self.index = index
 
     def __call__(self, v):
-        self._call_wrapped([v])
+        return self._call_wrapped([v])[0]
 
     def _call_wrapped(self, v):
         p = cmeans_predict(np.array([v]), self.c, 2, error=0.005, maxiter=10)[0]
@@ -130,9 +130,9 @@ FUZZY_SETS = {
         "<= 15": OpenTrapezoidFuzzySet(15, 20),
         "<= 35": OpenTrapezoidFuzzySet(35, 40),
         "<= 45": OpenTrapezoidFuzzySet(45, 50),
-        "<= 60>": OpenTrapezoidFuzzySet(60, 65),
-        "<= 99>": OpenTrapezoidFuzzySet(99, 100),
-        "All": OpenTrapezoidFuzzySet(100, 100),
+        "<= 60": OpenTrapezoidFuzzySet(60, 65),
+        "<= 99": OpenTrapezoidFuzzySet(99, 99),
+        "All": TrapezoidFuzzySet(99, 99, 100, 100),
     },
     "Individual-level analysed": {
         "~100": RadialFuzzySet(individual_analysed, 0),
