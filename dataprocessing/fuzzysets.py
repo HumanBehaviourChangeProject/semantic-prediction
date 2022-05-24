@@ -115,7 +115,7 @@ FUZZY_SETS = {
         "<= 15 month": OpenTrapezoidFuzzySet(15 * 4.35, 16 * 4.35),
         "<= 20 months": OpenTrapezoidFuzzySet(20 * 4.35, 21 * 4.35),
         "<= 28 months": OpenTrapezoidFuzzySet(28 * 4.35, 29 * 4.35),
-        "> 29 months": Verum(0, 36 * 4.35),
+        "> 29 months": Verum(0, 29 * 4.35),
     },
     "Mean number of times tobacco used": {
         "<= 5": OpenTrapezoidFuzzySet(5, 6),
@@ -123,7 +123,7 @@ FUZZY_SETS = {
         "<= 15": OpenTrapezoidFuzzySet(15, 16),
         "<= 20": OpenTrapezoidFuzzySet(20, 21),
         "<= 25": OpenTrapezoidFuzzySet(25, 26),
-        "> 26": Verum(0,26),
+        "> 26": Verum(0, 26),
     },
     "Proportion identifying as female gender": {
         "None": OpenTrapezoidFuzzySet(0, 1),
