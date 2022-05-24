@@ -7,7 +7,9 @@ import torch.optim as optim
 import copy
 import numpy as np
 import feature_config as fc
+from sklearn.model_selection import train_test_split
 
+RANDOM_SEED = 39106
 
 class RuleNet(nn.Module):
     def __init__(
@@ -56,7 +58,6 @@ class RuleNet(nn.Module):
                 if c > 0.5
             ) + " => " + str(self.rule_weights[i].item())
 
-
 def cross_val(patience, features, labels, variables):
     if torch.cuda.is_available():
         device = "cuda:0"
@@ -68,31 +69,59 @@ def cross_val(patience, features, labels, variables):
     features[features.isnan()] = 0
     results = []
     with open("results/rule_nn.txt", "w") as fout:
+        for _ in range(100):
+            index = list(np.array(range(features.shape[0])))
+            random.shuffle(index)
+            step = len(index) // 5
+            chunks = [index[i: i + step] for i in range(0, len(index), step)]
+            for i in range(len(chunks)):
+                train_index = [
+                    c for j in range(len(chunks)) for c in chunks[j] if i != j
+                ]
+                val_index = chunks[i]
+                best = main(
+                    patience,
+                    features,
+                    labels,
+                    train_index,
+                    val_index,
+                    variables,
+                    device
+                )
+            results.append(best)
+            for x in best[2]:
+                fout.write(str(x.item()) + "\n")
+            fout.flush()
+
+def single_run(patience, features, labels, variables, index):
+    if torch.cuda.is_available():
+        device = "cuda:0"
+    else:
+        device = "cpu"
+
+    train_index, val_index = train_test_split(list(range(len(features))), random_state=RANDOM_SEED, train_size=0.8)
+
+    features.to(device)
+    labels.to(device)
+    features[features.isnan()] = 0
+    results = []
+    with open("results/rulenn_errors_test.txt", "w") as fout:
         with open("results/rules.txt", "w") as frules:
-            for _ in range(100):
-                index = list(np.array(range(features.shape[0])))
-                random.shuffle(index)
-                step = len(index) // 5
-                chunks = [index[i : i + step] for i in range(0, len(index), step)]
-                for i in range(len(chunks)):
-                    train_index = [
-                        c for j in range(len(chunks)) for c in chunks[j] if i != j
-                    ]
-                    val_index = chunks[i]
-                    best = main(
-                        patience,
-                        features,
-                        labels,
-                        train_index,
-                        val_index,
-                        variables,
-                        frules,
-                        device,
-                    )
-                    results.append(best)
-                    for x in best[2]:
-                        fout.write(str(x.item()) + "\n")
-                    fout.flush()
+            best = main(
+                patience,
+                features,
+                labels,
+                train_index,
+                val_index,
+                variables,
+                device,
+                frules=frules
+            )
+            for i,x in zip(index[val_index], best[2]):
+                fout.write(f"{i}:{str(x.item())}\n")
+            fout.flush()
+
+
 
 def load_disjoint_filters(names):
     filters = []
@@ -126,7 +155,7 @@ def calculate_pure_fit(w, fltr):
     )[0]
 
 
-def main(epochs, features, labels, train_index, val_index, variables, frules, device):
+def main(epochs, features, labels, train_index, val_index, variables, device, frules=None):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
     pre = torch.tensor(
         np.linalg.lstsq(features[train_index].numpy(), labels[train_index, 0], rcond=None)[0],
@@ -228,21 +257,22 @@ def main(epochs, features, labels, train_index, val_index, variables, frules, de
         # print statistics
         if epoch % 10 == 0:
             print(
-                f"epoch: {epoch},\tloss: {(running_loss / j)},penalties: {(running_penalties / j)},\tval_loss: {val_loss.item()},\tval_alt: {val_rmse.item()},\tno improvement since: {no_improvement}"
+                f"epoch: {epoch},\tloss: {(running_loss / j)},\tpenalties: {(running_penalties / j)},\tval_loss: {val_loss.item()},\tval_alt: {val_rmse.item()},\tno improvement since: {no_improvement}"
             )
             running_loss = 0.0
             running_penalties = 0.0
             j = 0
         epoch += 1
     best_model = best[0][1]
-    rules = torch.cat(
-        (
-            nnf.hardsigmoid(best_model.conjunctions),
-            best_model.rule_weights.unsqueeze(-1),
-        ),
-        dim=-1,
-    )
-    frules.write(";".join("&".join(str(v.item()) for v in row) for row in rules) + "\n")
+    if frules is not None:
+        rules = torch.cat(
+            (
+                nnf.hardsigmoid(best_model.conjunctions),
+                best_model.rule_weights.unsqueeze(-1),
+            ),
+            dim=-1,
+        )
+        frules.write(";".join("&".join(str(v.item()) for v in row) for row in rules) + "\n")
     print("Finished Training")
     return best[0]
 
@@ -253,9 +283,11 @@ if __name__ == "__main__":
 
     with open(sys.argv[2], "rb") as fin:
         features, labels, rename = pickle.load(fin)
-    cross_val(
+    index = np.array(features.index)
+    single_run(
         int(sys.argv[1]),
         torch.tensor(features.astype(float).values).float(),
         torch.tensor(labels.astype(float)).float(),
         rename,
+        index
     )
