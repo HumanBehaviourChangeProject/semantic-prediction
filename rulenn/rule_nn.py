@@ -131,9 +131,9 @@ def single_run(patience, features, labels, variables, index):
         print("MSE:", tmf.mean_squared_error(y_pred, labels[test_index].squeeze(-1)))
     with open("results/rulenn_errors_all.csv", "w") as fout:
         y_pred = model(features)
-        fout.write(",".join(("doc,arm", "prediction", "target")) + "\n")
-        for t in zip(index, y_pred.tolist(), labels.squeeze(-1).tolist()):
-            fout.write(",".join((t[0][0], t[0][1], *map(str, t[1:]))) + "\n")
+        fout.write(",".join(("set", "doc,arm", "prediction", "target")) + "\n")
+        for i, t in enumerate(zip(index, y_pred.tolist(), labels.squeeze(-1).tolist())):
+            fout.write(",".join(("train" if i in train_index else ("test" if i in test_index else "val"), t[0][0], t[0][1], *map(str, t[1:]))) + "\n")
         fout.flush()
 
 
