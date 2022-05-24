@@ -9,7 +9,7 @@ VERBOSE = False
 
 def print_rules(df: pd.DataFrame):
     for row in df.iterrows():
-        print(" & ".join(df.columns[:-1][row[1][:-1]>0.1]) + " => " + str(row[1][-1]))
+        print(" & ".join(df.columns[:-1][row[1][:-1]>0.3]) + " => " + str(row[1][-1]))
 
 
 def print_applied_rules(df: pd.DataFrame, fits, features, fit_threshold=0.1, feature_threshold=0.1):
@@ -69,7 +69,6 @@ if __name__=="__main__":
             df = pd.DataFrame(rules)
             df.columns = names + ["not "+n for n in names] + ["weight"]
             print_rules(df)
-            exit()
             print("---")
             config = dict(conjunctions=logit(torch.tensor(df.iloc[:,:-1].values)), rule_weights = torch.tensor(df.iloc[:,-1].values))
             model = RuleNet(len(names), len(rules), 1, config=config)
