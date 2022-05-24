@@ -8,6 +8,7 @@ import copy
 import numpy as np
 import feature_config as fc
 from sklearn.model_selection import train_test_split
+from torchmetrics import functional as tmf
 
 RANDOM_SEED = 39106
 
@@ -106,25 +107,35 @@ def single_run(patience, features, labels, variables, index):
     labels.to(device)
     features[features.isnan()] = 0
     results = []
-    with open("results/rulenn_errors_test.txt", "w") as fout:
-        with open("results/rules.txt", "w") as frules:
-            best = main(
-                patience,
-                features,
-                labels,
-                train_index,
-                val_index,
-                variables,
-                device,
-                frules=frules
-            )
-            model = best[1]
-            model.eval()
-            y_pred = model(features[test_index]).tolist()
-            fout.write(",".join(("doc,arm","prediction","target")) + "\n")
-            for t in zip(index[test_index], y_pred, labels[test_index].squeeze(-1).tolist()):
-                fout.write(",".join((t[0][0],t[0][1],*map(str,t[1:]))) + "\n")
-            fout.flush()
+
+    with open("results/rules.txt", "w") as frules:
+        best = main(
+            patience,
+            features,
+            labels,
+            train_index,
+            val_index,
+            variables,
+            device,
+            frules=frules
+        )
+        model = best[1]
+        model.eval()
+
+    with open("results/rulenn_errors_test.csv", "w") as fout:
+        y_pred = model(features[test_index])
+        fout.write(",".join(("doc,arm","prediction","target")) + "\n")
+        for t in zip(index[test_index], y_pred.tolist(), labels[test_index].squeeze(-1).tolist()):
+            fout.write(",".join((t[0][0],t[0][1],*map(str,t[1:]))) + "\n")
+        fout.flush()
+        print("MSE:", tmf.mean_squared_error(y_pred, labels[test_index].squeeze(-1)))
+    with open("results/rulenn_errors_all.csv", "w") as fout:
+        y_pred = model(features)
+        fout.write(",".join(("doc,arm", "prediction", "target")) + "\n")
+        for t in zip(index, y_pred.tolist(), labels.squeeze(-1).tolist()):
+            fout.write(",".join((t[0][0], t[0][1], *map(str, t[1:]))) + "\n")
+        fout.flush()
+
 
 
 
