@@ -93,8 +93,6 @@ def cross_val(patience, features, labels, variables):
                     for x in best[2]:
                         fout.write(str(x.item()) + "\n")
                     fout.flush()
-                    exit()
-
 
 def load_disjoint_filters(names):
     filters = []
@@ -131,7 +129,7 @@ def calculate_pure_fit(w, fltr):
 def main(epochs, features, labels, train_index, val_index, variables, frules, device):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
     pre = torch.tensor(
-        np.linalg.lstsq(features.numpy(), labels[:, 0], rcond=None)[0],
+        np.linalg.lstsq(features[train_index].numpy(), labels[train_index, 0], rcond=None)[0],
         requires_grad=True,
     )
     conjs = torch.diag(10 * torch.ones(len(pre)))
