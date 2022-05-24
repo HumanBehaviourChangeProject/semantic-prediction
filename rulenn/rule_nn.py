@@ -100,6 +100,7 @@ def single_run(patience, features, labels, variables, index):
         device = "cpu"
 
     train_index, val_index = train_test_split(list(range(len(features))), random_state=RANDOM_SEED, train_size=0.8)
+    test_index, val_index = train_test_split(val_index, random_state=RANDOM_SEED, train_size=0.6)
 
     features.to(device)
     labels.to(device)
@@ -117,8 +118,12 @@ def single_run(patience, features, labels, variables, index):
                 device,
                 frules=frules
             )
-            for i,x in zip(index[val_index], best[2]):
-                fout.write(f"{i}:{str(x.item())}\n")
+            model = best[1]
+            model.eval()
+            y_pred = model(features[test_index]).tolist()
+            fout.write(",".join(("doc,arm","prediction","target")) + "\n")
+            for t in zip(index[test_index], y_pred, labels[test_index].squeeze(-1).tolist()):
+                fout.write(",".join((t[0][0],t[0][1],*map(str,t[1:]))) + "\n")
             fout.flush()
 
 
@@ -167,7 +172,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
     net.to(device)
     criterion = nn.MSELoss()
     val_criterion = nn.L1Loss()
-    optimizer = optim.Adam(net.parameters(), lr=1e-4)
+    optimizer = optim.Adam(net.parameters(), lr=5e-4)
     postfix = ""
     keep_top = 5
     no_improvement = 0
