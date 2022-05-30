@@ -202,7 +202,7 @@ def get_cross_split(features, num_splits=3):
 def main(epochs, features, labels, train_index, val_index, variables, device, frules=None):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
     pre = torch.tensor(
-        np.linalg.lstsq(features[train_index].numpy(), labels[train_index, 0], rcond=None)[0],
+        np.linalg.lstsq(features[train_index].cpu().numpy(), labels[train_index, 0], rcond=None)[0],
         requires_grad=True,
     )
     conjs = torch.diag(10 * torch.ones(len(pre)))
