@@ -37,7 +37,7 @@ class RuleNet(nn.Module):
 
     def calculate_fit(self, x0):
         mu = self.non_lin(self.conjunctions)
-        x = torch.concat((x0, 1 - x0), dim=1)
+        x = torch.cat((x0, 1 - x0), dim=1)
         x_exp = x.unsqueeze(1).expand((-1, self.conjunctions.shape[0], -1))
         x_pot = (mu * x_exp) + (1 - mu)  # torch.pow(x_exp, mu)
         return torch.min(x_pot, dim=-1)[0]
@@ -137,12 +137,12 @@ def single_run(patience, features, labels, variables, index):
         fout.flush()
 
 
-def load_disjoint_filters(names):
+def load_disjoint_filters(names,device=None):
     filters = []
-    z = torch.zeros(features.shape[1], requires_grad=False)
+    z = torch.zeros(features.shape[1], requires_grad=False, device=device)
     for (lh, rhs) in fc.features_disjoint.items():
         for rh in rhs:
-            v = torch.zeros(features.shape[1], requires_grad=False)
+            v = torch.zeros(features.shape[1], requires_grad=False, device=device)
             v[names.index[lh]] = 1
             v[names.index[rh]] = 1
             filters.append(torch.cat((v, z)))
@@ -150,12 +150,12 @@ def load_disjoint_filters(names):
     return torch.stack(filters)
 
 
-def load_implication_filters(names):
+def load_implication_filters(names, device=None):
     filters = []
-    z = torch.zeros(features.shape[1], requires_grad=False)
+    z = torch.zeros(features.shape[1], requires_grad=False, device=device)
     for (lh, rhs) in fc.features_implied.items():
         for rh in rhs:
-            v = torch.zeros(features.shape[1], requires_grad=False)
+            v = torch.zeros(features.shape[1], requires_grad=False, device=device)
             v[names.index(lh)] = 1
             v[names.index(rh)] = 1
             filters.append(torch.cat((v, z)))
@@ -202,7 +202,7 @@ def get_cross_split(features, num_splits=3):
 def main(epochs, features, labels, train_index, val_index, variables, device, frules=None):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
     pre = torch.tensor(
-        np.linalg.lstsq(features[train_index].cpu().numpy(), labels[train_index, 0], rcond=None)[0],
+        np.linalg.lstsq(features[train_index].cpu().numpy(), labels[train_index, 0].cpu(), rcond=None)[0],
         requires_grad=True,
     )
     conjs = torch.diag(10 * torch.ones(len(pre)))
@@ -220,12 +220,12 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
     j = 0
     running_loss = 0.0
     running_penalties = 0.0
-    d = torch.diag(torch.ones((features.shape[1],), requires_grad=False))
-    z = torch.zeros(features.shape[1], features.shape[1], requires_grad=False)
+    d = torch.diag(torch.ones((features.shape[1],), requires_grad=False, device=device))
+    z = torch.zeros(features.shape[1], features.shape[1], requires_grad=False,device=device)
     pos = torch.cat([d, z])
     neg = torch.cat([z, d])
-    implication_filter = load_implication_filters(variables)
-    disjoint_filter = load_implication_filters(variables)
+    implication_filter = load_implication_filters(variables,device=device)
+    disjoint_filter = load_disjoint_filters(variables,device=device)
 
     while epoch < 200 or no_improvement < 50:  # loop over the dataset multiple times
         # get the inputs; data is a list of [inputs, labels]
@@ -247,7 +247,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
                 torch.sum(w * (1 - w), dim=-1), dim=0
             )  # penalty for non-crisp rules
             m = torch.max(
-                torch.stack((torch.sum(w, dim=-1) - 3, torch.zeros(w.shape[:-1]))),
+                torch.stack((torch.sum(w, dim=-1) - 3, torch.zeros(w.shape[:-1],device=device))),
                 dim=0,
             )
             long_rules_penalty = torch.sum(m[0], dim=0)  # penalty for long rules
