@@ -143,8 +143,8 @@ def load_disjoint_filters(names,device=None):
     for (lh, rhs) in fc.features_disjoint.items():
         for rh in rhs:
             v = torch.zeros(features.shape[1], requires_grad=False, device=device)
-            v[names.index[lh]] = 1
-            v[names.index[rh]] = 1
+            v[names.index(lh)] = 1
+            v[names.index(rh)] = 1
             filters.append(torch.cat((v, z)))
             filters.append(torch.cat((z, v)))
     return torch.stack(filters)
@@ -215,7 +215,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
     postfix = ""
     keep_top = 5
     no_improvement = 0
-    epoch = 301
+    epoch = 0
     best = []
     j = 0
     running_loss = 0.0
@@ -310,7 +310,6 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
             running_penalties = 0.0
             j = 0
         epoch += 1
-        break
     best_model = best[0][1]
     if frules is not None:
         rules = torch.cat(
