@@ -10,7 +10,7 @@ import feature_config as fc
 from sklearn.model_selection import train_test_split
 from torchmetrics import functional as tmf
 
-RANDOM_SEED = 39106
+RANDOM_SEED = None
 
 class RuleNet(nn.Module):
     def __init__(
@@ -59,27 +59,26 @@ class RuleNet(nn.Module):
                 if c > 0.5
             ) + " => " + str(self.rule_weights[i].item())
 
-def cross_val(patience, features, labels, variables):
+
+def cross_val(patience, raw_features, raw_labels, variables, index):
     if torch.cuda.is_available():
         device = "cuda:0"
     else:
         device = "cpu"
 
-    features.to(device)
-    labels.to(device)
+    features = torch.tensor(raw_features.values, dtype=torch.float).to(device)
+    labels = torch.tensor(raw_labels, dtype=torch.float).to(device)
     features[features.isnan()] = 0
-    results = []
-    with open("results/rule_nn.txt", "w") as fout:
-        for _ in range(100):
-            index = list(np.array(range(features.shape[0])))
-            random.shuffle(index)
-            step = len(index) // 5
-            chunks = [index[i: i + step] for i in range(0, len(index), step)]
-            for i in range(len(chunks)):
+
+    with open("results/rule_cross_nn.txt", "w") as fout:
+        for _ in range(10):
+            chunks = get_cross_split(raw_features, 5)
+            for i in range(len(chunks)-1):
                 train_index = [
-                    c for j in range(len(chunks)) for c in chunks[j] if i != j
+                    c for j in range(len(chunks)) for c in chunks[j] if i != j and i != j-1
                 ]
                 val_index = chunks[i]
+                test_index = chunks[i+1]
                 best = main(
                     patience,
                     features,
@@ -89,10 +88,13 @@ def cross_val(patience, features, labels, variables):
                     variables,
                     device
                 )
-            results.append(best)
-            for x in best[2]:
-                fout.write(str(x.item()) + "\n")
-            fout.flush()
+
+                model = best[1]
+                model.eval()
+                y_pred = model(features[test_index])
+
+                for pred, targ in zip(y_pred.tolist(), labels[test_index].squeeze(-1).tolist()):
+                    fout.write( str(pred-targ) + "\n")
 
 def single_run(patience, features, labels, variables, index):
     if torch.cuda.is_available():
@@ -100,13 +102,11 @@ def single_run(patience, features, labels, variables, index):
     else:
         device = "cpu"
 
-    train_index, val_index = train_test_split(list(range(len(features))), random_state=RANDOM_SEED, train_size=0.8)
-    test_index, val_index = train_test_split(val_index, random_state=RANDOM_SEED, train_size=0.6)
-
-    features.to(device)
-    labels.to(device)
+    features = torch.tensor(features.values, dtype=torch.float).to(device)
+    labels = torch.tensor(labels, dtype=torch.float).to(device)
     features[features.isnan()] = 0
-    results = []
+
+    train_index, test_index, val_index = get_data_split(features, labels, seed=RANDOM_SEED)
 
     with open("results/rules.txt", "w") as frules:
         best = main(
@@ -135,8 +135,6 @@ def single_run(patience, features, labels, variables, index):
         for i, t in enumerate(zip(index, y_pred.tolist(), labels.squeeze(-1).tolist())):
             fout.write(",".join(("train" if i in train_index else ("test" if i in test_index else "val"), t[0][0], t[0][1], *map(str, t[1:]))) + "\n")
         fout.flush()
-
-
 
 
 def load_disjoint_filters(names):
@@ -171,6 +169,36 @@ def calculate_pure_fit(w, fltr):
     )[0]
 
 
+def get_data_split(features, labels, seed=None):
+    documents = list(i[0] for i in features.index)
+    random.shuffle(documents)
+
+    train_doc_index, val_doc_index = train_test_split(list(documents), random_state=seed, train_size=0.8)
+    test_doc_index, val_doc_index = train_test_split(val_doc_index, random_state=seed, train_size=0.6)
+
+    train_index = [i for i, t in enumerate(features.index) if t[0] in train_doc_index]
+    test_index = [i for i, t in enumerate(features.index) if t[0] in test_doc_index]
+    val_index = [i for i, t in enumerate(features.index) if t[0] in val_doc_index]
+
+    return train_index, test_index, val_index
+
+
+def get_cross_split(features, num_splits=3):
+    documents = list(i[0] for i in features.index)
+    random.shuffle(documents)
+
+    p = 1/num_splits
+
+    splits = []
+    remainder = documents
+    for i in range(num_splits):
+        split, remainder = train_test_split(remainder, train_size=p)
+        splits.append(split)
+
+    return [[i for i, t in enumerate(features.index) if t[0] in split] for split in splits]
+
+
+
 def main(epochs, features, labels, train_index, val_index, variables, device, frules=None):
     # test_index, val_index = train_test_split(test_index, test_size=0.25)
     pre = torch.tensor(
@@ -187,7 +215,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
     postfix = ""
     keep_top = 5
     no_improvement = 0
-    epoch = 0
+    epoch = 301
     best = []
     j = 0
     running_loss = 0.0
@@ -215,7 +243,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
             outputs = net(features[batch_index])
             w = net.non_lin(net.conjunctions)
             base_loss = criterion(outputs, batch_labels)
-            non_crips_penalty = 2 * torch.sum(
+            non_crips_penalty = 10 * e * torch.sum(
                 torch.sum(w * (1 - w), dim=-1), dim=0
             )  # penalty for non-crisp rules
             m = torch.max(
@@ -227,9 +255,11 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
             contradiction_penalty = 0.5 * torch.sum(
                 torch.sum(torch.matmul(w, pos) * torch.matmul(w, neg), dim=-1), dim=-1
             )
+
             disjoint_penalty = 0.5 * torch.mean(
                 torch.sum(calculate_pure_fit(w, disjoint_filter), dim=-1), dim=-1
             )
+
             implied_penalty = 0.5 * torch.mean(
                 torch.sum(calculate_pure_fit(w, implication_filter), dim=-1), dim=-1
             )
@@ -249,11 +279,12 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
             running_loss += base_loss.detach().item()
             running_penalties += penalties.detach().item()
             j += 1
-
+        net.eval()
         with torch.no_grad():
             val_out = net(features[val_index])
             val_loss = criterion(val_out, labels[val_index].squeeze(-1))
-            val_rmse = val_criterion(val_out, labels[val_index].squeeze(-1)) ** 0.5
+            val_rmse = val_criterion(val_out, labels[val_index].squeeze(-1))
+        net.train()
 
         if epoch > 300:
             if not best or val_loss - best[-1][0] < -0.05:
@@ -279,6 +310,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
             running_penalties = 0.0
             j = 0
         epoch += 1
+        break
     best_model = best[0][1]
     if frules is not None:
         rules = torch.cat(
@@ -300,10 +332,10 @@ if __name__ == "__main__":
     with open(sys.argv[2], "rb") as fin:
         features, labels, rename = pickle.load(fin)
     index = np.array(features.index)
-    single_run(
+    cross_val(
         int(sys.argv[1]),
-        torch.tensor(features.astype(float).values).float(),
-        torch.tensor(labels.astype(float)).float(),
+        features,
+        labels,
         rename,
         index
     )
