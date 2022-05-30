@@ -304,7 +304,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
         # print statistics
         if epoch % 10 == 0:
             print(
-                f"epoch: {epoch},\tloss: {(running_loss / j)},\tpenalties: {(running_penalties / j)},\tval_loss: {val_loss.item()},\tval_alt: {val_rmse.item()},\tno improvement since: {no_improvement}"
+                f"epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\tval_alt: {val_rmse.item():.2f},\tno improvement since: {no_improvement}"
             )
             running_loss = 0.0
             running_penalties = 0.0
