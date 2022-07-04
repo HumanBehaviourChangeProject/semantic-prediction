@@ -555,10 +555,13 @@ def main():
     ds, id_map, prio_names, attribute_name_map = load_attributes_from_json()
     print("Build fuzzy dataset")
     cleaned_removed, arm_name_map = load_deleted()
-    write_csv({doc_id:{arm_id: ds[doc_id][arm_id] for arm_id in arms} for doc_id, arms in cleaned_removed.items()}, attribute_name_map)
-    exit()
+
+    # Filter those documents that were manually selected by experts
+    # write_csv(ds, attribute_name_map)
+    ds = {doc_id: {arm_id: ds[doc_id][arm_id] for arm_id in arms} for doc_id, arms in
+     cleaned_removed.items()}
     # features, labels, rename = sub_control(cleaned_removed, arm_name_map)
-    features, labels, rename = default_feature_extraction(cleaned_removed, arm_name_map)
+    features, labels, rename = default_feature_extraction(ds, arm_name_map)
 
     rename, features, labels = get_extended_fuzzy_data(rename, features, labels)
     write_fuzzy(rename, features, labels)
