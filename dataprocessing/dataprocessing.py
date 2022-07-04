@@ -11,7 +11,7 @@ import numpy as np
 import re
 from fuzzysets import FUZZY_SETS
 
-from cleaner import is_number, clean_attributes, COMBINED_TIME_POINT_ID
+from cleaner import is_number, clean_attributes, COMBINED_TIME_POINT_ID, ATTRIBUTES_TO_CLEAN
 from reader import JSONReader
 
 NUMERIC_ATTRIBUTES = (
@@ -138,7 +138,9 @@ def load_attributes(prio_names, id_map):
         raw_id = int(av["attribute"].split("(")[0])
         at = id_map.get(raw_id, raw_id)
         if at not in attributes_raw:
-            attributes_raw[at] = av["attribute"].split("(")[1].split(")")[0]
+            lpar = av["attribute"].index("(")
+            rpar = av["attribute"].rindex(")")
+            attributes_raw[at] = av["attribute"][lpar+1:rpar]
         try:
             a = attrs[at]
         except KeyError:
@@ -169,71 +171,20 @@ def load_attributes(prio_names, id_map):
             v = str(v)
         a.add((v, av.get("context")))
 
+    dropped_attrs = set()
     attributes = {0: "Combined follow up"}
     for k, v in attributes_raw.items():
         if v.strip() in prio_names:
             attributes[k] = v.strip()
-
+        else:
+            dropped_attrs.add(v.strip())
+    print(dropped_attrs)
     for a in prio_names:
         if a not in attributes.values():
             print("Missing:", a)
 
-    return attributes, doc_attrs
+    return attributes, doc_attrs, prio_names
 
-
-def write_attribute_values(attributes, doc_attrs, prio, id_map, id_map_reverse):
-    workbook = xlsxwriter.Workbook("/tmp/attribute_values_na.xlsx")
-    worksheet = workbook.add_worksheet()
-    fixed_attributes = list(
-        sorted(
-            [a for a in attributes.keys() if id_map.get(a, a) in prio]
-            + [COMBINED_TIME_POINT_ID],
-            key=lambda x: id_map_reverse.get(x, x),
-        )
-    )
-    for i, aid in enumerate(fixed_attributes):
-        worksheet.write(0, i + 4, attributes[aid])
-
-    for i, aid in enumerate(fixed_attributes):
-        worksheet.write(1, i + 4, id_map_reverse.get(aid, aid))
-
-    for i, aid in enumerate(fixed_attributes):
-        worksheet.write(2, i + 4, id_map.get(aid, aid))
-
-    row_counter = 3
-
-    for doc, arms in sorted(doc_attrs.items()):
-        # if len(arms) > 1:
-        #    worksheet.merge_range(f'A{row_counter+1}:A{row_counter + len(arms)}', doc)
-        # else:
-        #    worksheet.write(row_counter, 0, doc)
-        for arm, arm_attributes in arms.items():
-            doc_name, doc_id = doc.split("___")
-            arm_name, arm_id = arm.split("___")
-            worksheet.write(row_counter, 0, doc_name)
-            worksheet.write(row_counter, 1, doc_id)
-            worksheet.write(row_counter, 2, arm_name)
-            worksheet.write(row_counter, 3, arm_id)
-            combined_time_point = arm_attributes.get(6451782) or arm_attributes.get(
-                6451773
-            )
-            if combined_time_point:
-                arm_attributes[COMBINED_TIME_POINT_ID] = combined_time_point
-
-            for i, attribute_id in enumerate(fixed_attributes):
-                worksheet.write(
-                    row_counter,
-                    4 + i,
-                    ";".join(
-                        set(
-                            x[0]
-                            for x in arm_attributes.get(attribute_id, {("-", None)})
-                        )
-                    ),
-                )
-            row_counter += 1
-
-    workbook.close()
 
 def write_bct_contexts(attributes, cleaned, doc_attrs, doc_name_map, arm_name_map):
     bcts = (
@@ -487,7 +438,7 @@ def get_control(doc_attrs, arm_name_map):
     print(f"Valid arms: {valids} out of {num_arms}")
 
 
-def write_csv(doc_attrs, attributes):
+def write_csv(doc_attrs, attribute_name_map):
     with open("features.csv", "w") as fout:
         writer = csv.writer(fout)
         columns = list(
@@ -499,10 +450,10 @@ def write_csv(doc_attrs, attributes):
                 if k != 6080518 and k != 6451791
             }
         )
-        writer.writerow(columns)
+        writer.writerow([attribute_name_map.get(c, c) for c in columns])
         for doc_id, arms in doc_attrs.items():
             for arm_id, sattr in arms.items():
-                writer.writerow([*(sattr[k] for k in columns)])
+                writer.writerow([*(sattr.get(k,"-") for k in columns)])
 
 
 def plot_control(doc_attrs, arm_name_map):
@@ -588,21 +539,24 @@ def default_feature_extraction(doc_attrs, arm_name_map):
         column_names,
     )
 
+
 def load_attributes_from_json():
     json_reader = JSONReader()
     id_map = json_reader.load_id_map(init={COMBINED_TIME_POINT_ID: COMBINED_TIME_POINT_ID})
-    id_map_reverse = dict(map(reversed, id_map.items()))
     prio, prio_names = json_reader.load_prio()
     print("Load attributes")
-    attributes, doc_attrs = load_attributes(prio_names, id_map)
+    attribute_name_map, doc_attrs, prio_names = load_attributes(prio_names, id_map)
     # print("Clean attributes")
-    cleaned, doc_name_map, arm_name_map = clean_attributes(doc_attrs)
-    return cleaned
+    cleaned, doc_name_map, arm_name_map = clean_attributes(doc_attrs, ATTRIBUTES_TO_CLEAN)
+    return cleaned, id_map, prio_names, attribute_name_map
+
 
 def main():
+    ds, id_map, prio_names, attribute_name_map = load_attributes_from_json()
     print("Build fuzzy dataset")
     cleaned_removed, arm_name_map = load_deleted()
-    # write_csv(cleaned_removed, attributes)
+    write_csv({doc_id:{arm_id: ds[doc_id][arm_id] for arm_id in arms} for doc_id, arms in cleaned_removed.items()}, attribute_name_map)
+    exit()
     # features, labels, rename = sub_control(cleaned_removed, arm_name_map)
     features, labels, rename = default_feature_extraction(cleaned_removed, arm_name_map)
 
