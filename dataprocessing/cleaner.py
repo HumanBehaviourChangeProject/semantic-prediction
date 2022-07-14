@@ -1,5 +1,6 @@
 import csv
 from thefuzz import process as fw_process, fuzz
+import json
 
 COMBINED_TIME_POINT_ID = 0
 
@@ -10,7 +11,6 @@ ATTRIBUTES_TO_CLEAN = (
         6823485,
         6823487,
         "brief advise",
-        6452743,
         6452744,
         6452745,
         6452746,
@@ -21,7 +21,6 @@ ATTRIBUTES_TO_CLEAN = (
         6452751,
         6452752,
         6452753,
-        6452754,
         6452755,
         6452756,
         6452757,
@@ -154,6 +153,29 @@ ATTRIBUTES_TO_CLEAN = (
         6830268,
         6080719,
     )
+
+def apply_diff(dataset, attr_map):
+    with open("data/diff.json", "r") as fin:
+        diff = json.load(fin)
+
+    with open("data/deleted.txt", "r") as fin:
+        for doc_id in fin:
+            del dataset[doc_id.strip()]
+
+
+    for doc_id, doc_changes in diff.items():
+        for arm_id, arm_changes in doc_changes.items():
+            ds = dataset[doc_id][arm_id]
+            for key in arm_changes:
+                num_key = attr_map.get(key,key)
+                if arm_changes[key][0] == ds.get(num_key):
+                    ds[num_key] = arm_changes[key][1]
+                else:
+                    print("Original value in diff does not match value in "
+                          "dataset. Diff was not applied for this instance."
+                          f"({arm_changes[key][0]} != {ds.get(num_key)}")
+
+    return dataset
 
 def load_countries_and_cities():
     with open("data/worldcities.csv", "r") as fin:
@@ -391,7 +413,6 @@ mappings = {
     6451788: any_as_presence,
     6823485: any_as_presence,
     6823487: process_motivational_interviewing,
-    6452743: any_as_presence,
     6452744: any_as_presence,
     6452745: any_as_presence,
     6452746: any_as_presence,
@@ -402,7 +423,6 @@ mappings = {
     6452751: any_as_presence,
     6452752: any_as_presence,
     6452753: any_as_presence,
-    6452754: any_as_presence,
     6452755: any_as_presence,
     6452756: any_as_presence,
     6452757: any_as_presence,
@@ -525,7 +545,7 @@ mappings = {
 }
 
 
-def clean_attributes(doc_attrs, attributes_to_clean):
+def clean_attributes(doc_attrs, attributes_to_clean, attribute_name_map):
     cleaned = dict()
 
     doc_name_map = dict()
@@ -558,6 +578,8 @@ def clean_attributes(doc_attrs, attributes_to_clean):
                 cleaned[doc_id] = doc_arms = dict()
             doc_arms[arm_id] = values
 
+    cleaned = apply_diff(cleaned, dict(map(reversed, attribute_name_map.items())))
+
     actual_cleaned_attributes = list(
         sorted(
             {
@@ -569,11 +591,7 @@ def clean_attributes(doc_attrs, attributes_to_clean):
             key=str,
         )
     )
-    diff = (
-        set(actual_cleaned_attributes)
-        .difference(attributes_to_clean)
-        .union(set(attributes_to_clean).difference(actual_cleaned_attributes))
-    )
+    diff = set(attributes_to_clean).difference(actual_cleaned_attributes)
     assert not diff, diff
 
     return cleaned, doc_name_map, arm_name_map

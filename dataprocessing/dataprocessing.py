@@ -10,250 +10,10 @@ from skfuzzy import cluster as fc
 import numpy as np
 import re
 from fuzzysets import FUZZY_SETS
-
+from writer import write_csv, write_fuzzy
 from cleaner import is_number, clean_attributes, COMBINED_TIME_POINT_ID, ATTRIBUTES_TO_CLEAN
-from reader import JSONReader
+from reader import JSONReader, parse_int, load_attributes
 
-NUMERIC_ATTRIBUTES = (
-    4099754,
-    6451782,
-    6451791,
-    6080481,
-    6080485,
-    6080486,
-    6080495,
-    6080499,
-    6080501,
-    6080506,
-    6080512,
-    6080717,
-    6080719,
-    6080721,
-    6080722,
-    6080724,
-    6099675,
-    6823479,
-    6823480,
-    6823482,
-)
-
-def parse_int(textnum, numwords={}):
-    # create our default word-lists
-    if not numwords:
-
-        # singles
-        units = [
-            "zero",
-            "one",
-            "two",
-            "three",
-            "four",
-            "five",
-            "six",
-            "seven",
-            "eight",
-            "nine",
-            "ten",
-            "eleven",
-            "twelve",
-            "thirteen",
-            "fourteen",
-            "fifteen",
-            "sixteen",
-            "seventeen",
-            "eighteen",
-            "nineteen",
-        ]
-
-        # tens
-        tens = [
-            "",
-            "",
-            "twenty",
-            "thirty",
-            "forty",
-            "fifty",
-            "sixty",
-            "seventy",
-            "eighty",
-            "ninety",
-        ]
-
-        # larger scales
-        scales = ["hundred", "thousand", "million", "billion", "trillion"]
-
-        # divisors
-        numwords["and"] = (1, 0)
-
-        # perform our loops and start the swap
-        for idx, word in enumerate(units):
-            numwords[word] = (1, idx)
-        for idx, word in enumerate(tens):
-            numwords[word] = (1, idx * 10)
-        for idx, word in enumerate(scales):
-            numwords[word] = (10 ** (idx * 3 or 2), 0)
-
-    # primary loop
-    current = result = 0
-    # loop while splitting to break into individual words
-    for word in textnum.replace("-", " ").lower().split():
-        # if problem then fail-safe
-        if word not in numwords:
-            raise ValueError("Illegal word: " + word)
-
-        # use the index by the multiplier
-        scale, increment = numwords[word]
-        current = current * scale + increment
-
-        # if larger than 100 then push for a round 2
-        if scale > 100:
-            result += current
-            current = 0
-
-    # return the result plus the current
-    return result + current
-
-
-def load_attributes(prio_names, id_map):
-    with open("data/trainAVs.txt", "r") as fin:
-        d = json.load(fin)
-
-    doc_attrs = dict()
-    # attributes = {int(l.split("(")[0]): l.split("(")[1].split(")")[0] for l in open("/home/glauer/.PyCharm2019.3/config/scratches/hbcp/scratch_3.txt")}
-    attributes_raw = dict()
-
-    tries = 0
-    successes = 0
-    for av in d:
-        try:
-            arms = doc_attrs[av["docName"]]
-        except KeyError:
-            arms = dict()
-            doc_attrs[av["docName"]] = arms
-        try:
-            attrs = arms[av["arm"]]
-        except KeyError:
-            attrs = dict()
-            arms[av["arm"]] = attrs
-        raw_id = int(av["attribute"].split("(")[0])
-        at = id_map.get(raw_id, raw_id)
-        if at not in attributes_raw:
-            lpar = av["attribute"].index("(")
-            rpar = av["attribute"].rindex(")")
-            attributes_raw[at] = av["attribute"][lpar+1:rpar]
-        try:
-            a = attrs[at]
-        except KeyError:
-            a = set()
-            attrs[at] = a
-        v = av["value"]
-        if at in NUMERIC_ATTRIBUTES:
-            tries += 1
-            successes += 1
-            v = v.replace(",", "").replace("percent", "").replace("Þ", "fi")
-            try:
-                if "." in v:
-                    v = float(v)
-                else:
-                    v = int(v)
-            except ValueError:
-                if v.lower() in ("single", "once"):
-                    v = 1
-                elif v.lower() in ("twice",):
-                    v = 2
-                elif v.lower() in ("fıve", "fve"):
-                    v = 2
-                else:
-                    try:
-                        v = parse_int(v)
-                    except ValueError:
-                        successes -= 1
-            v = str(v)
-        a.add((v, av.get("context")))
-
-    dropped_attrs = set()
-    attributes = {0: "Combined follow up"}
-    for k, v in attributes_raw.items():
-        if v.strip() in prio_names:
-            attributes[k] = v.strip()
-        else:
-            dropped_attrs.add(v.strip())
-    print(dropped_attrs)
-    for a in prio_names:
-        if a not in attributes.values():
-            print("Missing:", a)
-
-    return attributes, doc_attrs, prio_names
-
-
-def write_bct_contexts(attributes, cleaned, doc_attrs, doc_name_map, arm_name_map):
-    bcts = (
-        6452745,
-        6452746,
-        6452748,
-        6452756,
-        6452757,
-        6452838,
-        6452840,
-        6452948,
-        6452949,
-        6452763,
-        6452831,
-        6452836,
-    )
-    bct_contexts = {attributes[i]: dict() for i in bcts}
-
-    for doc, arms in sorted(doc_attrs.items()):
-        # if len(arms) > 1:
-        #    worksheet.merge_range(f'A{row_counter+1}:A{row_counter + len(arms)}', doc)
-        # else:
-        #    worksheet.write(row_counter, 0, doc)
-        for arm, arm_attributes in arms.items():
-            doc_name, doc_id = doc.split("___")
-            arm_name, arm_id = arm.split("___")
-            for aid in bcts:
-                try:
-                    values = arm_attributes[aid]
-                except KeyError:
-                    pass
-                else:
-                    bct_contexts[attributes[aid]][
-                        (doc_name, doc_id, arm_name, arm_id)
-                    ] = [context for (_, context) in values]
-
-    with open("/tmp/bct_context.csv", "wt") as fout:
-        w = csv.writer(fout)
-        for attr, doc_con in bct_contexts.items():
-            w.writerow([attr])
-            for (doc, doc_id, arm_name, arm_id), contexts in doc_con.items():
-                w.writerow(["", doc, doc_id, arm_name, arm_id] + contexts)
-
-    with open("/tmp/outcome_value_contexts.csv", "w") as fout:
-        writer = csv.writer(fout)
-        writer.writerow(
-            ["document", "document_id", "arm", "arm_id"]
-            + [b for a in (6451791,) for b in [attributes.get(a, a)]]
-            + ["context"]
-        )
-        # writer.writerow(["", ""] + [b for a in cleaned_attributes for b in [a]])
-        for doc_id, arms in cleaned.items():
-            for arm_id, arm in arms.items():
-                writer.writerow(
-                    [doc_name_map[doc_id], doc_id, arm_name_map[arm_id], arm_id]
-                    + [
-                        x
-                        for attribute_id in (6451791,)
-                        for vals in (arm.get(attribute_id, "-"),)
-                        for x in [vals]
-                    ]
-                    + [
-                        list(
-                            doc_attrs[doc_name_map[doc_id] + "___" + doc_id][
-                                arm_name_map[arm_id] + "___" + arm_id
-                            ].get(6451791, {(None, "-- no node in graph --")})
-                        )[0][1]
-                    ]
-                )
 
 
 def get_fuzzy_data(attributes, cleaned_attributes, cleaned):
@@ -314,9 +74,6 @@ def get_extended_fuzzy_data(rename, features, labels):
     return names, new_features, labels
 
 
-def write_fuzzy(rename, features, labels):
-    with open("data/hbcp_gen.pkl", "wb") as fout:
-        pickle.dump((features, np.array(labels), rename), fout)
 
 
 def load_deleted():
@@ -437,47 +194,6 @@ def get_control(doc_attrs, arm_name_map):
 
     print(f"Valid arms: {valids} out of {num_arms}")
 
-
-def write_csv(doc_attrs, attribute_name_map):
-    with open("features.csv", "w") as fout:
-        writer = csv.writer(fout)
-        columns = list(
-            {
-                k
-                for _, arms in doc_attrs.items()
-                for _, sattr in arms.items()
-                for k in sattr.keys()
-                if k != 6080518 and k != 6451791
-            }
-        )
-        writer.writerow([attribute_name_map.get(c, c) for c in columns])
-        for doc_id, arms in doc_attrs.items():
-            for arm_id, sattr in arms.items():
-                writer.writerow([*(sattr.get(k,"-") for k in columns)])
-
-
-def plot_control(doc_attrs, arm_name_map):
-    diffs = []
-    pairs = []
-    for doc_id, arm_id, study, control in get_control(doc_attrs, arm_name_map):
-        if control:
-            assert len(control) == 1
-            c = control[0].get(6451791, None)
-            if c is not None:
-                for sattr in study:
-                    s = sattr.get(6451791, None)
-                    diffs.append({"label": "diff", "value": s - c})
-                    diffs.append({"label": "therapy", "value": np.average(s)})
-                    diffs.append({"label": "all", "value": np.average(s)})
-                    pairs.append(dict(therapy=s, control=c))
-                diffs.append({"label": "control", "value": c})
-                diffs.append({"label": "all", "value": c})
-    ax = sb.boxplot(x="label", y="value", data=pd.DataFrame(diffs))
-    plt.show()
-    ax = sb.scatterplot(data=pd.DataFrame(pairs), x="therapy", y="control")
-    plt.savefig("/tmp/scatter.png")
-
-
 def sub_control(doc_attrs, arm_name_map):
     features = []
     labels = []
@@ -510,26 +226,27 @@ def sub_control(doc_attrs, arm_name_map):
     )
 
 
-def default_feature_extraction(doc_attrs, arm_name_map):
+def default_feature_extraction(doc_attrs,attribute_name_map):
     features = []
     labels = []
     index = []
+    key_outcome_value = 6451791
     # columns = [k for k in cleaned_attributes if k != 6080518 and k != 6451791]
     columns = list(
         {
-            k
+            attribute_name_map.get(k,k)
             for _, arms in doc_attrs.items()
             for _, sattr in arms.items()
             for k in sattr.keys()
-            if k != "Outcome value" and k != "country"
+            if k != key_outcome_value and k != "country"
         }
     )
     column_names = columns  # [printable_attribute_names.get(k, k).replace(" ", "_") for k in columns]
     for doc_id, arms in doc_attrs.items():
         for arm_id, sattr in arms.items():
-            if sattr["Outcome value"]:
-                features.append([*(sattr[k] for k in columns)])
-                labels.append(sattr["Outcome value"])
+            if sattr.get(key_outcome_value):
+                features.append([*(sattr.get(k) for k in columns)])
+                labels.append(sattr[key_outcome_value])
                 index.append((doc_id, arm_id))
 
     idx = pd.MultiIndex.from_tuples(index, names=("doc", "arm"))
@@ -547,19 +264,16 @@ def load_attributes_from_json():
     print("Load attributes")
     attribute_name_map, doc_attrs, prio_names = load_attributes(prio_names, id_map)
     # print("Clean attributes")
-    cleaned, doc_name_map, arm_name_map = clean_attributes(doc_attrs, ATTRIBUTES_TO_CLEAN)
+    cleaned, doc_name_map, arm_name_map = clean_attributes(doc_attrs, ATTRIBUTES_TO_CLEAN, id_map)
     return cleaned, id_map, prio_names, attribute_name_map
 
 
 def main():
     ds, id_map, prio_names, attribute_name_map = load_attributes_from_json()
     print("Build fuzzy dataset")
-    cleaned_removed, arm_name_map = load_deleted()
-    write_csv({doc_id:{arm_id: ds[doc_id][arm_id] for arm_id in arms} for doc_id, arms in cleaned_removed.items()}, attribute_name_map)
-    exit()
+    #write_csv(ds, attribute_name_map)
     # features, labels, rename = sub_control(cleaned_removed, arm_name_map)
-    features, labels, rename = default_feature_extraction(cleaned_removed, arm_name_map)
-
+    features, labels, rename = default_feature_extraction(ds, attribute_name_map)
     rename, features, labels = get_extended_fuzzy_data(rename, features, labels)
     write_fuzzy(rename, features, labels)
 
