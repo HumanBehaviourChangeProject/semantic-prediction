@@ -36,13 +36,13 @@ class TrapezoidFuzzySet(FuzzySet):
             if fs.r0 == fs.r:
                 sns.lineplot(x=[self.l, self.r], y=[1, 1], label=label)
             else:
-                sns.lineplot(x=[self.l, self.r, self.r0], y=[1, 1, 0],
-                             label=label)
+                sns.lineplot(x=[self.l, self.r, self.r0], y=[1, 1, 0], label=label)
         elif fs.r0 == fs.r:
             sns.lineplot(x=[self.l0, self.l, self.r], y=[0, 1, 1], label=label)
         else:
-            sns.lineplot(x=[self.l0, self.l, self.r, self.r0], y=[0, 1, 1, 0],
-                         label=label)
+            sns.lineplot(
+                x=[self.l0, self.l, self.r, self.r0], y=[0, 1, 1, 0], label=label
+            )
 
 
 class OpenTrapezoidFuzzySet(FuzzySet):
@@ -66,13 +66,13 @@ class OpenTrapezoidFuzzySet(FuzzySet):
         if self.r0 == self.r:
             sns.lineplot(x=[0, self.r], y=[1, 1], label=label)
         else:
-            sns.lineplot(x=[0, self.r, self.r0], y=[1, 1, 0],
-                         label=label)
+            sns.lineplot(x=[0, self.r, self.r0], y=[1, 1, 0], label=label)
+
 
 class Verum(TrapezoidFuzzySet):
+    def __init__(self, l, r):
+        super().__init__(l, l, r, r)
 
-    def __init__(self, l,r):
-        super().__init__(l,l,r,r)
 
 class RadialFuzzySet(FuzzySet):
     def __init__(self, centers, index):
@@ -87,10 +87,9 @@ class RadialFuzzySet(FuzzySet):
         return p[self.index]
 
     def plot(self, canvas, label):
-        x = np.arange(0,max(self.c)*1.5)
-        y=self._call_wrapped(x)
+        x = np.arange(0, max(self.c) * 1.5)
+        y = self._call_wrapped(x)
         sns.lineplot(x=x, y=y, label=label)
-
 
 
 female_centers = np.array(

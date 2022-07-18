@@ -18,11 +18,13 @@ def write_csv(doc_attrs, attribute_name_map):
         writer.writerow([attribute_name_map.get(c, c) for c in columns])
         for doc_id, arms in doc_attrs.items():
             for arm_id, sattr in arms.items():
-                writer.writerow([*(sattr.get(k,"-") for k in columns)])
+                writer.writerow([*(sattr.get(k, "-") for k in columns)])
 
-def write_fuzzy(rename, features, labels):
+
+def write_fuzzy(features, labels):
     with open("data/hbcp_gen.pkl", "wb") as fout:
-        pickle.dump((features, np.array(labels), rename), fout)
+        pickle.dump((features, np.array(labels)), fout)
+
 
 def write_bct_contexts(attributes, cleaned, doc_attrs, doc_name_map, arm_name_map):
     bcts = (
