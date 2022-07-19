@@ -324,17 +324,17 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
     return best[0]
 
 
-if __name__ == "__main__":
-    import pickle
-    import sys
-
-    with open(sys.argv[2], "rb") as fin:
-        features, labels, rename = pickle.load(fin)
-    index = np.array(features.index)
-    cross_val(
-        int(sys.argv[1]),
-        features,
-        labels,
-        rename,
-        index
-    )
+#if __name__ == "__main__":
+#    import pickle
+#    import sys
+#
+#    with open(sys.argv[2], "rb") as fin:
+#        features, labels, rename = pickle.load(fin)
+#    index = np.array(features.index)
+#    cross_val(
+#        int(sys.argv[1]),
+#        features,
+#        labels,
+#        rename,
+#        index
+#    )
