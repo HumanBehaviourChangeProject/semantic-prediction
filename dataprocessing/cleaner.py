@@ -10,22 +10,37 @@ def apply_diff(dataset, attr_map):
     with open("data/diff.json", "r") as fin:
         diff = json.load(fin)
 
+    drop_docs = set()
+
     with open("data/deleted.txt", "r") as fin:
-        for doc_id in fin:
-            del dataset[doc_id.strip()]
+        fin = [int(d.strip()) for d in fin]
+        for doc_id, aid in dataset.keys():
+            if doc_id in fin:
+                drop_docs.add((doc_id, aid))
+
+    for k in drop_docs:
+        del dataset[k]
 
     for doc_id, doc_changes in diff.items():
         for arm_id, arm_changes in doc_changes.items():
-            ds = dataset[doc_id][arm_id]
+            try:
+                doc_id = int(doc_id)
+            except:
+                pass
+            try:
+                arm_id = int(arm_id)
+            except:
+                pass
+            ds = dataset[(int(doc_id),int(arm_id))]
             for key in arm_changes:
                 num_key = attr_map.get(key, key)
                 if arm_changes[key][0] == ds.get(num_key):
-                    ds[num_key] = arm_changes[key][1]
+                    ds[num_key] = clean_row({key: arm_changes[key][1]})
                 else:
                     print(
                         "Original value in diff does not match value in "
-                        "dataset. Diff was not applied for this instance."
-                        f"({arm_changes[key][0]} != {ds.get(num_key)}"
+                        f"dataset for key {key}. Diff was not applied for this"
+                        f" instance. ({ds.get(num_key)} != {arm_changes[key][0]}"
                     )
 
     return dataset
@@ -488,6 +503,54 @@ class CountryCleaner(AttributeCleaner):
             else:
                 return dict()
         return {ident: value}
+
+
+class PregnancyTrialCleaner(AttributeCleaner):
+
+    @property
+    def linked_attributes(self):
+        return tuple()
+
+    def __call__(self, ident, data):
+        d = {
+            "Pregnancy trial": 0,
+            "Pregnancy trial (Mixed)": 0,
+        }
+        v = data.get("Pregnancy trial 1 = yes, 2 = mix pg and non-pg")
+        if v is not None:
+            if v == "1":
+                d["Pregnancy trial"] = 1
+            elif v == "2":
+                d["Pregnancy trial (Mixed)"] = 1
+            else:
+                raise ValueError("Unexpected value", v)
+
+        return d
+
+
+class RelapsePreventionTrialCleaner(AttributeCleaner):
+    @property
+    def linked_attributes(self):
+        return tuple()
+
+    def __call__(self, ident, data):
+        d = {
+            "Relapse Prevention Trial": 0,
+            "Relapse Prevention Trial(Mixed)": 0,
+        }
+        v = data.get("Relapse prevention trial (1 = yes, 2 = mix of quitters and non-abstinent)")
+        if v is not None:
+            if v == "1":
+                d["Relapse Prevention Trial"] = 1
+            elif v == "2":
+                d["Relapse Prevention Trial(Mixed)"] = 1
+            else:
+                raise ValueError("Unexpected value", v)
+
+        return d
+
+def get_id(s):
+    return int(s.split("___")[1])
 
 
 def clean_row(row):

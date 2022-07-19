@@ -2,7 +2,7 @@ import json
 import csv
 import pandas as pd
 from abc import ABC, abstractmethod
-from cleaner import clean_row
+from cleaner import clean_row, apply_diff, get_id, PregnancyTrialCleaner, RelapsePreventionTrialCleaner
 from thefuzz import fuzz
 
 
@@ -106,13 +106,15 @@ class BaseReader(ABC):
 class AttributeReader(BaseReader):
     def read(self, *args) -> pd.DataFrame:
         doc_attrs, attribute_names = self._read()
+
         d = {
-            (a, b): {
+            (get_id(a), get_id(b)): {
                 (k, attribute_names.get(k, k)): v for k, v in clean_row(attrs).items()
             }
             for a, arms in doc_attrs.items()
             for b, attrs in arms.items()
         }
+        apply_diff(d, attribute_names)
         return pd.DataFrame(d).T
 
     def load_prio(self):
