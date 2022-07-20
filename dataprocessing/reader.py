@@ -2,7 +2,7 @@ import json
 import csv
 import pandas as pd
 from abc import ABC, abstractmethod
-from cleaner import clean_row, apply_diff, get_id, PregnancyTrialCleaner, RelapsePreventionTrialCleaner
+from cleaner import clean_row, get_id, PregnancyTrialCleaner, RelapsePreventionTrialCleaner, Differ, Dropper
 from thefuzz import fuzz
 
 
@@ -100,22 +100,7 @@ class BaseReader(ABC):
                 v = str(v)
             a.add((v, av.get("context")))
 
-        return doc_attrs, attributes_raw
-
-
-class AttributeReader(BaseReader):
-    def read(self, *args) -> pd.DataFrame:
-        doc_attrs, attribute_names = self._read()
-
-        d = {
-            (get_id(a), get_id(b)): {
-                (k, attribute_names.get(k, k)): v for k, v in clean_row(attrs).items()
-            }
-            for a, arms in doc_attrs.items()
-            for b, attrs in arms.items()
-        }
-        apply_diff(d, attribute_names)
-        return pd.DataFrame(d).T
+        return doc_attrs, {k:v.strip() for k,v in attributes_raw.items()}
 
     def load_prio(self):
         with open("data/prio.txt", "r") as fin:
@@ -131,6 +116,21 @@ class AttributeReader(BaseReader):
                     prio = set(self.rec_attr(cs))
 
         return prio, prio_names
+
+class AttributeReader(BaseReader):
+    def read(self, *args) -> pd.DataFrame:
+        doc_attrs, attribute_names = self._read()
+        differ = Differ()
+        dropper = Dropper()
+        d = {
+            (get_id(a), get_id(b)): {
+                (k, attribute_names.get(k, k)): v for k, v in clean_row(attrs, differ.get_diff(get_id(a),get_id(b))).items()
+            }
+            for a, arms in doc_attrs.items()
+            if not dropper.should_be_dropped(get_id(a))
+            for b, attrs in arms.items()
+        }
+        return pd.DataFrame(d).T
 
     def rec_attr(self, cs):
         for attr in cs["Attributes"]["AttributesList"]:

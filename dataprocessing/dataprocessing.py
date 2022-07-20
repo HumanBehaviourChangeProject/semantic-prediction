@@ -27,18 +27,19 @@ class Fuzzyfier:
         inflated_data = dict()
         names = []
         for col in features.columns:
+            print(col)
             values = features.loc[:, col]
             fltr = values.notnull()
             filtered = values[fltr].astype(float)
             if not np.max(filtered) <= 1:
-                fs = FUZZY_SETS.get(col[0])
+                fs = FUZZY_SETS.get(col[1])
                 if fs is not None:
                     fuzzy_sets = list(fs.items())
                     new_values = np.zeros((values.shape[0], len(fuzzy_sets)))
                     new_values[fltr] = np.array(
-                        [[fs(v) for _, fs in fuzzy_sets] for v in filtered]
+                        [[fs(v) if v is not None else None for _, fs in fuzzy_sets] for v in filtered]
                     )
-                    new_names = [f"{col[1]} ({x})" for x in (l for l, _ in fuzzy_sets)]
+                    new_names = [(f"{col[1]} ({x})", f"{col[1]} ({x})") for x in (l for l, _ in fuzzy_sets)]
                 else:
                     n_centroids = 5
                     exfl = np.expand_dims(filtered, axis=-1).T
@@ -68,7 +69,7 @@ def main():
 
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
-    write_fuzzy(features, labels)
+    write_fuzzy(features.astype(float), labels.astype(float))
 
 
 if __name__ == "__main__":

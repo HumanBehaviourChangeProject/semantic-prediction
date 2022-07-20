@@ -6,44 +6,22 @@ from abc import ABC, abstractmethod
 _MAPPINGS = set()
 
 
-def apply_diff(dataset, attr_map):
-    with open("data/diff.json", "r") as fin:
-        diff = json.load(fin)
+class Dropper:
+    def __init__(self):
+        with open("data/deleted.txt", "r") as fin:
+            self.deleted_documents = [int(d.strip()) for d in fin]
 
-    drop_docs = set()
+    def should_be_dropped(self, doc_id):
+        return doc_id in self.deleted_documents
 
-    with open("data/deleted.txt", "r") as fin:
-        fin = [int(d.strip()) for d in fin]
-        for doc_id, aid in dataset.keys():
-            if doc_id in fin:
-                drop_docs.add((doc_id, aid))
 
-    for k in drop_docs:
-        del dataset[k]
+class Differ:
+    def __init__(self):
+        with open("data/diff.json", "r") as fin:
+            self.diff = json.load(fin)
 
-    for doc_id, doc_changes in diff.items():
-        for arm_id, arm_changes in doc_changes.items():
-            try:
-                doc_id = int(doc_id)
-            except:
-                pass
-            try:
-                arm_id = int(arm_id)
-            except:
-                pass
-            ds = dataset[(int(doc_id),int(arm_id))]
-            for key in arm_changes:
-                num_key = attr_map.get(key, key)
-                if arm_changes[key][0] == ds.get(num_key):
-                    ds[num_key] = clean_row({key: arm_changes[key][1]})
-                else:
-                    print(
-                        "Original value in diff does not match value in "
-                        f"dataset for key {key}. Diff was not applied for this"
-                        f" instance. ({ds.get(num_key)} != {arm_changes[key][0]}"
-                    )
-
-    return dataset
+    def get_diff(self, doc_id, arm_id):
+        return self.diff[str(doc_id)][str(arm_id)]
 
 
 def load_countries_and_cities():
@@ -63,17 +41,22 @@ class AttributeCleaner(ABC):
     def linked_attributes(self):
         raise NotImplementedError
 
-    @abstractmethod
-    def __call__(self, ident, data):
-        raise NotImplementedError
+    def __call__(self, ident, data, diff):
+        return self.apply_diff(self.get_value(ident, data), diff)
 
+    def apply_diff(self, values, diff):
+        return values
+
+    @abstractmethod
+    def get_value(self, ident, data):
+        raise NotImplementedError
 
 class RoundingCleaner(AttributeCleaner):
     @property
     def linked_attributes(self):
-        return (6451791, 6080481, 6080485, 6080486, 6080512, 6080719)
+        return (6080481, 6080485, 6080486, 6080512, 6080719)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         v = None
         if ident in data:
             for i in reversed(range(0, 3)):
@@ -87,7 +70,7 @@ class RoundingCleaner(AttributeCleaner):
         if v:
             return {ident: v}
         else:
-            return dict()
+            return {ident:None}
 
 
 class PresenceCleaner(AttributeCleaner):
@@ -212,7 +195,7 @@ class PresenceCleaner(AttributeCleaner):
             6830264,
         )
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         x = data.get(ident, False)
         if x:
             v = 1
@@ -220,6 +203,20 @@ class PresenceCleaner(AttributeCleaner):
             v = 0
         return {ident: v}
 
+
+class OutcomeValueCleaner(RoundingCleaner):
+
+    @property
+    def linked_attributes(self):
+        return (6451791,)
+
+    def apply_diff(self, values, diff):
+        new_ov = diff.get("NEW Outcome value")
+        v = values[6451791]
+        if new_ov:
+            v = new_ov[1]
+        values[6451791] = float(v.replace(",","."))
+        return values
 
 def _clean(x):
     return x.replace(",", "").replace(";", "").replace("-", "").replace(" ", "").lower()
@@ -245,7 +242,7 @@ class MotivationalIntervewingCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6823487,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         v = 0
         brief = 0
         for x, _ in data.get(ident, tuple()):
@@ -263,7 +260,7 @@ class DigitalContentCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080691,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         v = 0
         text_message = 0
         for x, _ in data.get(ident, tuple()):
@@ -281,7 +278,7 @@ class DistanceCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080687,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         keys = ("phone", "call", "telephone", "quitline", "hotline")
         phone = 0
         for x, _ in data.get(ident, tuple()):
@@ -299,7 +296,7 @@ class SomaticCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080693,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         keys = {
             "gum": ["gum", "polacrilex"],
             "lozenge": ["lozenge"],
@@ -315,9 +312,9 @@ class SomaticCleaner(AttributeCleaner):
         d = dict(
             gum=0, lozenge=0, e_cigarette=0, inhaler=0, placebo=0, nasal_spray=0, nrt=0
         )
-        d.update(self.any_as_presence(ident, data))
+        d.update(self.any_as_presence.get_value(ident, data))
         d = _process_with_key_list(ident, keys, data, initial_dictionary=d)
-        patch = self.any_as_presence(6080694, data)[6080694]
+        patch = self.any_as_presence.get_value(6080694, data)[6080694]
         if d["gum"] or d["lozenge"] or d["e_cigarette"] or patch or d["inhaler"]:
             d["nrt"] = 1
         return d
@@ -331,7 +328,7 @@ class PillCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080695,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         keys = {
             "bupropion": (
                 ["bupropion"],
@@ -349,7 +346,7 @@ class PillCleaner(AttributeCleaner):
                 False,
             ),
         }
-        d = self.any_as_presence(ident, data)
+        d = self.any_as_presence.get_value(ident, data)
         for x, _ in data.get(ident, tuple()):
             for key, (patterns, ands, ors) in keys.items():
                 match = fw_process.extract(x, patterns)
@@ -366,7 +363,7 @@ class HealthProfessionalCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080704,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         keys = {
             "nurse": ["nurse"],
             "doctor": [
@@ -381,7 +378,7 @@ class HealthProfessionalCleaner(AttributeCleaner):
                 "internal medicine",
             ],
         }
-        d = self.any_as_presence(ident, data)
+        d = self.any_as_presence.get_value(ident, data)
         d = _process_with_key_list(ident, keys, data, initial_dictionary=d)
         return d
 
@@ -391,7 +388,7 @@ class PsychologistCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080706,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         keys = {"pychologist": ["pychologist", "psychol"]}
         d = _process_with_key_list(ident, keys, data)
         return d
@@ -402,7 +399,7 @@ class PatientRoleCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080508,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         keys = {"aggregate patient role": ["patient"]}
         d = {"aggregate patient role": 0}
         d = _process_with_key_list(
@@ -416,7 +413,7 @@ class HealthCareFacilityCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080629,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         keys = {"healthcare facility": ["smok"]}
         d = _process_with_key_list(
             ident,
@@ -448,10 +445,10 @@ class PharmacologicalInterestCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6830268,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         return {
-            ident: self.any_as_presence(ident, data).get(ident, 0)
-            or self.any_as_presence(6830264, data).get(6830264, 0)
+            ident: self.any_as_presence.get_value(ident, data).get(ident, 0)
+            or self.any_as_presence.get_value(6830264, data).get(6830264, 0)
         }
 
 
@@ -463,11 +460,31 @@ class TimePointCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6451782,)
 
-    def __call__(self, ident, data):
+    def apply_diff(self, values, diff):
+        v = values.get("Combined follow up")
+        tpv = diff.get("Manually added follow-up duration value")
+        tpu = diff.get("Manually added follow-up duration units")
+        if tpu and tpv:
+            if tpu[1] == "days":
+                factor = 1/7
+            elif tpu[1] == "weeks":
+                factor = 1
+            elif tpu[1] == "months":
+                factor = 4.35
+            elif tpu[1] in ("years", "year"):
+                factor = 4.35*12
+            else:
+                raise Exception(f"Unknown unit {tpu[1]}")
+            v =  float(tpv[1].replace(",",".")) * factor
+        if v is not None:
+            values["Combined follow up"] = float(v)
+        return values
+
+    def get_value(self, ident, data):
         v = data.get(6451782) or data.get(6451773)
-        k = "combined followup"
+        k = "Combined follow up"
         if v:
-            return self.use_rounded(k, {k: v})
+            return self.use_rounded.get_value(k, {k: v})
         else:
             return {k: v}
 
@@ -480,7 +497,7 @@ class CountryCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080518,)
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         countries_values = data.get(ident, set())
         if countries_values:
             countries_values = [x for x, _ in countries_values]
@@ -511,7 +528,7 @@ class PregnancyTrialCleaner(AttributeCleaner):
     def linked_attributes(self):
         return tuple()
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         d = {
             "Pregnancy trial": 0,
             "Pregnancy trial (Mixed)": 0,
@@ -533,7 +550,7 @@ class RelapsePreventionTrialCleaner(AttributeCleaner):
     def linked_attributes(self):
         return tuple()
 
-    def __call__(self, ident, data):
+    def get_value(self, ident, data):
         d = {
             "Relapse Prevention Trial": 0,
             "Relapse Prevention Trial(Mixed)": 0,
@@ -553,7 +570,7 @@ def get_id(s):
     return int(s.split("___")[1])
 
 
-def clean_row(row):
+def clean_row(row, diff):
     values = {
         "bupropion": 0,
         "varenicline": 0,
@@ -564,7 +581,7 @@ def clean_row(row):
 
     for cleaner in _MAPPINGS:
         for attribute_id in cleaner.linked_attributes:
-            mapped = cleaner(attribute_id, row)
+            mapped = cleaner(attribute_id, row, diff)
             mapped_with_context = {k: mapped.get(k, 0) for k in mapped}
             values.update(mapped_with_context)
     return values
