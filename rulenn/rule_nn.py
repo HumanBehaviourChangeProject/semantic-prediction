@@ -96,17 +96,17 @@ def cross_val(patience, raw_features, raw_labels, variables, index):
                 for pred, targ in zip(y_pred.tolist(), labels[test_index].squeeze(-1).tolist()):
                     fout.write( str(pred-targ) + "\n")
 
-def single_run(patience, features, labels, variables, index):
+def single_run(patience, raw_features, raw_labels, variables, index):
     if torch.cuda.is_available():
         device = "cuda:0"
     else:
         device = "cpu"
 
-    features = torch.tensor(features.values, dtype=torch.float).to(device)
-    labels = torch.tensor(labels, dtype=torch.float).to(device)
+    features = torch.tensor(raw_features.values, dtype=torch.float).to(device)
+    labels = torch.tensor(raw_labels, dtype=torch.float).to(device)
     features[features.isnan()] = 0
 
-    train_index, test_index, val_index = get_data_split(features, labels, seed=RANDOM_SEED)
+    train_index, test_index, val_index = get_data_split(raw_features, raw_labels, seed=RANDOM_SEED)
 
     with open("results/rules.txt", "w") as frules:
         best = main(
@@ -126,14 +126,14 @@ def single_run(patience, features, labels, variables, index):
         y_pred = model(features[test_index])
         fout.write(",".join(("doc,arm","prediction","target")) + "\n")
         for t in zip(index[test_index], y_pred.tolist(), labels[test_index].squeeze(-1).tolist()):
-            fout.write(",".join((t[0][0],t[0][1],*map(str,t[1:]))) + "\n")
+            fout.write(",".join((str(t[0][0]), str(t[0][1]), *map(str,t[1:]))) + "\n")
         fout.flush()
         print("MSE:", tmf.mean_squared_error(y_pred, labels[test_index].squeeze(-1)))
     with open("results/rulenn_errors_all.csv", "w") as fout:
         y_pred = model(features)
         fout.write(",".join(("set", "doc,arm", "prediction", "target")) + "\n")
         for i, t in enumerate(zip(index, y_pred.tolist(), labels.squeeze(-1).tolist())):
-            fout.write(",".join(("train" if i in train_index else ("test" if i in test_index else "val"), t[0][0], t[0][1], *map(str, t[1:]))) + "\n")
+            fout.write(",".join(("train" if i in train_index else ("test" if i in test_index else "val"), str(t[0][0]), str(t[0][1]), *map(str, t[1:]))) + "\n")
         fout.flush()
 
 
@@ -141,23 +141,28 @@ def load_disjoint_filters(names,device=None):
     filters = []
     z = torch.zeros(features.shape[1], requires_grad=False, device=device)
     for (lh, rhs) in fc.features_disjoint.items():
+        lhi = get_index(lh, names)
         for rh in rhs:
             v = torch.zeros(features.shape[1], requires_grad=False, device=device)
-            v[names.index(lh)] = 1
-            v[names.index(rh)] = 1
+            v[lhi] = 1
+            v[get_index(rh, names)] = 1
             filters.append(torch.cat((v, z)))
             filters.append(torch.cat((z, v)))
     return torch.stack(filters)
+
+def get_index(v, names):
+    return names.index(v)
 
 
 def load_implication_filters(names, device=None):
     filters = []
     z = torch.zeros(features.shape[1], requires_grad=False, device=device)
     for (lh, rhs) in fc.features_implied.items():
+        lhi = get_index(lh, names)
         for rh in rhs:
             v = torch.zeros(features.shape[1], requires_grad=False, device=device)
-            v[names.index(lh)] = 1
-            v[names.index(rh)] = 1
+            v[lhi] = 1
+            v[get_index(rh, names)] = 1
             filters.append(torch.cat((v, z)))
             filters.append(torch.cat((z, v)))
     return torch.stack(filters)
@@ -165,7 +170,7 @@ def load_implication_filters(names, device=None):
 
 def calculate_pure_fit(w, fltr):
     return torch.min(
-        w.unsqueeze(1).repeat(1, fltr.shape[0], 1) * fltr + (1 - fltr), dim=-1
+        w.unsqueeze(1).expand(-1, fltr.shape[0], -1) * fltr + (1 - fltr), dim=-1
     )[0]
 
 
@@ -230,7 +235,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
     while epoch < 200 or no_improvement < 50:  # loop over the dataset multiple times
         # get the inputs; data is a list of [inputs, labels]
         # forward + backward + optimize
-        e = 0.2 * torch.sigmoid(
+        e = torch.sigmoid(
             torch.tensor(epoch / 25 - 6, device=device, requires_grad=False)
         )
         batch_size = 10
@@ -304,7 +309,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
         # print statistics
         if epoch % 10 == 0:
             print(
-                f"epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\tval_alt: {val_rmse.item():.2f},\tno improvement since: {no_improvement}"
+                f"{{epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\tval_alt: {val_rmse.item():.2f},\te: {e}}}"
             )
             running_loss = 0.0
             running_penalties = 0.0
@@ -329,9 +334,10 @@ if __name__ == "__main__":
     import sys
 
     with open(sys.argv[2], "rb") as fin:
-        features, labels, rename = pickle.load(fin)
+        features, labels = pickle.load(fin)
+    rename = [x[1] for x in features.columns]
     index = np.array(features.index)
-    cross_val(
+    single_run(
         int(sys.argv[1]),
         features,
         labels,
