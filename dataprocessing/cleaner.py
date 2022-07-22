@@ -76,117 +76,119 @@ class RoundingCleaner(AttributeCleaner):
 class PresenceCleaner(AttributeCleaner):
     @property
     def linked_attributes(self):
+        # Features that are commented out, are not present in the dataset
         return (
             6451788,
             6823485,
-            6452744,
-            6452745,
-            6452746,
-            6452747,
-            6452748,
-            6452749,
-            6452750,
-            6452751,
-            6452752,
-            6452753,
-            6452755,
-            6452756,
-            6452757,
-            6452758,
-            6452759,
-            6452760,
-            6452761,
-            6452762,
-            6452763,
-            6452764,
-            6452765,
-            6452830,
-            6452831,
-            6452832,
-            6452833,
-            6452834,
-            6452836,
-            6452837,
-            6452838,
-            6452839,
-            6452840,
-            6452843,
-            6452844,
-            6452845,
-            6452846,
-            6452847,
-            6452848,
-            6452849,
-            6452850,
-            6452851,
-            6452852,
-            6452853,
-            6452854,
-            6452855,
-            6452856,
-            6452857,
-            6452858,
-            6452859,
-            6452860,
-            6452861,
-            6452862,
-            6452863,
-            6452864,
-            6452865,
-            6452930,
-            6452931,
-            6452932,
-            6452933,
-            6452934,
-            6452935,
-            6452936,
-            6452937,
-            6452938,
-            6452939,
-            6452940,
-            6452941,
-            6452942,
-            6452943,
-            6452944,
-            6452945,
-            6452946,
-            6452947,
-            6452948,
-            6452949,
-            6452950,
-            6452952,
-            6452953,
-            6452954,
-            6452955,
-            6452956,
-            6452957,
-            6452959,
-            6452960,
-            6452961,
-            6452962,
-            6452963,
-            6452964,
-            6452965,
-            6452966,
-            6452967,
-            6452968,
-            6452969,
-            6452970,
-            6452973,
-            6452974,
-            6452975,
-            6452976,
-            6452977,
-            6452978,
-            6452979,
-            6452980,
-            6452981,
-            6452982,
-            6452983,
-            6452984,
-            6452985,
-            6452986,
-            6452987,
+            6823485, # CBT
+            #(6452744, 6452744)
+            6452745, # 1.1.Goal setting (behavior)
+            6452746, # 1.2 Problem solving
+            6452747, # 1.3 Goal setting (outcome)
+            6452748, # 1.4 Action planning
+            6452749, # 1.5 Review behavior goal(s)
+            6452750, # 1.6 Discrepancy between current behavior and goal
+            6452751, # 1.7 Review outcome goal(s)
+            6452752, # 1.8 Behavioral contract
+            6452753, # 1.9 Commitment
+            6452755, # 2.1 Monitoring of behavior by others without feedback
+            6452756, # 2.2 Feedback on behaviour
+            6452757, # 2.3 Self-monitoring of behavior
+            6452758, # 2.4 Self-monitoring of outcome(s) of behaviour
+            6452759, # 2.5 Monitoring of outcome(s) of behavior without feedback
+            6452760, # 2.6 Biofeedback
+            6452761, # 2.7 Feedback on outcome(s) of behavior
+            #(6452762, 6452762)
+            6452763, # 3.1 Social support (unspecified)
+            6452764, # 3.2 Social support (practical)
+            6452765, # 3.3 Social support (emotional)
+            #(6452830, 6452830)
+            6452831, # 4.1 Instruction on how to perform the behavior
+            6452832, # 4.2 Information about Antecedents
+            6452833, # 4.3 Re-attribution
+            #(6452834, 6452834)
+            6452836, # 4.5. Advise to change behavior
+            #(6452837, 6452837)
+            6452838, # 5.1 Information about health consequences
+            6452839, # 5.2 Salience of consequences
+            6452840, # 5.3 Information about social and environmental consequences
+            6452843, # 5.4 Monitoring of emotional consequences
+            #(6452844, 6452844)
+            #(6452845, 6452845)
+            #(6452846, 6452846)
+            6452847, # 6.1 Demonstration of behavior
+            6452848, # 6.2 Social comparison
+            6452849, # 6.3 Information about others' approval
+            #(6452850, 6452850)
+            6452851, # 7.1 Prompts/cues
+            #(6452852, 6452852)
+            6452853, # 7.3 Reduce prompts/cues
+            6452854, # 7.4 Remove access to the reward
+            6452855, # 7.5 Remove aversive stimulus
+            6452856, # 7.6 Satiation
+            6452857, # 7.7 Exposure
+            6452858, # 7.8 Associative learning
+            #(6452859, 6452859)
+            6452860, # 8.1 Behavioral practice/rehearsal
+            6452861, # 8.2 Behavior substitution
+            #(6452862, 6452862)
+            6452863, # 8.4 Habit reversal
+            #(6452864, 6452864)
+            #(6452865, 6452865)
+            6452930, # 8.7 Graded tasks
+            #(6452931, 6452931)
+            6452932, # 9.1 Credible source
+            6452933, # 9.2 Pros and cons
+            6452934, # 9.3 Comparative imagining of future outcomes
+            #(6452935, 6452935)
+            6452936, # 10.1 Material incentive (behavior)
+            6452937, # 10.2 Material reward (behavior)
+            6452938, # 10.3 Non-specific reward
+            6452939, # 10.4 Social reward
+            6452940, # 10.5 Social incentive
+            6452941, # 10.6 Non-specific incentive
+            #(6452942, 6452942)
+            6452943, # 10.8 Incentive (outcome)
+            6452944, # 10.9 Self-reward
+            6452945, # 10.10 Reward (outcome)
+            6452946, # 10.11 Future punishment
+            #(6452947, 6452947)
+            6452948, # 11.1 Pharmacological support
+            6452949, # 11.2 Reduce negative emotions
+            #(6452950, 6452950)
+            #(6452952, 6452952)
+            #(6452953, 6452953)
+            6452954, # 12.1 Restructuring the physical environment
+            6452955, # 12.2 Restructuring the social environment
+            6452956, # 12.3 Avoidance/reducing exposure to cues for the behavior
+            6452957, # 12.4 Distraction
+            6452959, # 12.5 Adding objects to the environment
+            6452960, # 12.6 Body changes
+            #(6452961, 6452961)
+            6452962, # 13.1 Identification of self as role model
+            6452963, # 13.2 Framing/reframing
+            6452964, # 13.3 Incompatible beliefs
+            6452965, # 13.4 Valued self-identify
+            6452966, # 13.5 Identity associated with changed behavior
+            #(6452967, 6452967)
+            6452968, # 14.1 Behavior cost
+            6452969, # 14.2 Punishment
+            6452970, # 14.3 Remove reward
+            6452973, # 14.4 Reward approximation
+            #(6452974, 6452974)
+            #(6452975, 6452975)
+            #(6452976, 6452976)
+            6452977, # 14.8 Reward alternative behavior
+            6452978, # 14.9 Reduce reward frequency
+            #(6452979, 6452979)
+            #(6452980, 6452980)
+            6452981, # 15.1 Verbal persuasion about capability
+            6452982, # 15.2 Mental rehearsal of successful performance
+            6452983, # 15.3 Focus on past success
+            6452984, # 15.4 Self-talk
+            #(6452985, 6452985)
+            6452986, # 16.1 Imaginary punishment
+            6452987, # 16.2 Imaginary reward
             6080701,
             6080686,
             6080692,
