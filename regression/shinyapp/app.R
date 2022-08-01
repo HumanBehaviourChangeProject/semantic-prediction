@@ -2,7 +2,7 @@ setwd("/Users/hastingj/Work/Python/semantic-prediction/regression")
 
 
 if (!require('xlsx',quietly = T)) install.packages('xlsx'); library('xlsx')
-if (!require('tidyverse',quietly = T)) install.packages('tidyverse'); library(tidyverse)
+#if (!require('tidyverse',quietly = T)) install.packages('tidyverse'); library(tidyverse)
 if (!require('lme4',quietly=T)) install.packages('lme4') ; library(lme4)
 if (!require('jtools',quietly = T)) install.packages('jtools'); library(jtools)
 # The next two are required by jtools
@@ -378,3 +378,8 @@ server <- function(input, output) {
 
 options(shiny.port = 5001)
 shinyApp(ui = ui, server = server)
+
+
+
+
+
