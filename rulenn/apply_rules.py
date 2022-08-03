@@ -51,7 +51,9 @@ if __name__=="__main__":
     import sys
 
     with open(sys.argv[1], "rb") as fin:
-        features, labels, names = pickle.load(fin)
+        features, labels = pickle.load(fin)
+
+    names = [x[1] for x in features.columns]
 
     for i in range(2, len(sys.argv)):
         if sys.argv[i] == "-v":
