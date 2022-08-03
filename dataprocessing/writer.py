@@ -1,24 +1,17 @@
 import csv
 import pickle
 import numpy as np
+import pandas as pd
 
 
-def write_csv(doc_attrs, attribute_name_map):
+def write_csv(data:pd.DataFrame):
+
     with open("features.csv", "w") as fout:
         writer = csv.writer(fout)
-        columns = list(
-            {
-                k
-                for _, arms in doc_attrs.items()
-                for _, sattr in arms.items()
-                for k in sattr.keys()
-                if k != 6080518 and k != 6451791
-            }
-        )
-        writer.writerow([attribute_name_map.get(c, c) for c in columns])
-        for doc_id, arms in doc_attrs.items():
-            for arm_id, sattr in arms.items():
-                writer.writerow([*(sattr.get(k, "-") for k in columns)])
+        columns = ["document", "arm"] + [c[1] for c in data.columns]
+        writer.writerow(columns)
+        for row in data.iterrows():
+            writer.writerow([*(str(v) for v in row[0]),*(str(v) if not pd.isna(v) else "-" for v in row[1])])
 
 
 def write_fuzzy(features, labels):

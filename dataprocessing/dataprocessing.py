@@ -27,7 +27,6 @@ class Fuzzyfier:
         inflated_data = dict()
         names = []
         for col in features.columns:
-            print(col)
             values = features.loc[:, col]
             fltr = values.notnull()
             filtered = values[fltr].astype(float)
@@ -62,6 +61,8 @@ def main():
     reader = AttributeReader()
     ds = reader.read()
     print("Build fuzzy dataset")
+
+    write_csv(ds)
 
     labels = ds[6451791]
     feature_columns = [c[0] not in (6451791, 6080518) for c in ds.columns]
