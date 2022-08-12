@@ -14,6 +14,7 @@ def print_rules(df: pd.DataFrame):
 
 def print_applied_rules(df: pd.DataFrame, fits, features, fit_threshold=0.1, feature_threshold=0.1):
     rules = []
+    explanations = []
     for row, fit in zip(df.iterrows(), fits[0]):
         conjunction = [f"{df.columns[i]}"+ (f"[{row[1][i]}]" if VERBOSE else "") for i in range(len(df.columns)-1) if row[1][i]>feature_threshold]
         impact = fit.item()*row[1][-1]
@@ -28,17 +29,19 @@ def print_applied_rules(df: pd.DataFrame, fits, features, fit_threshold=0.1, fea
         if VERBOSE:
             impstr += f" (fit: {fit.item()})"
         if fit > fit_threshold:
-            print(" & ".join(conjunction) + " => " + impstr)
-    return rules
+            expl = " & ".join(conjunction) + " => " + impstr
+            print(expl)
+            explanations.append(expl)
+    return explanations
 
 
-def get_feature_row_str(row, names,threshold=0.1):
+def get_feature_row_str(features, names,threshold=0.1):
     present_features = []
-    for i in range(len(row[1])):
-        if row[1][i] > threshold:
+    for i in range(len(features)):
+        if features[i] > threshold:
             s = names[i]
             if VERBOSE:
-                s += f" [{row[1][i]}]"
+                s += f" [{features[i]}]"
             present_features.append(s)
     return " & ".join(present_features)
 

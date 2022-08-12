@@ -1,4 +1,4 @@
-setwd("/Users/hastingj/Work/Python/semantic-prediction/regression")
+setwd("/Users/hastingj/Work/Python/semantic-prediction/")
 
 
 if (!require('xlsx',quietly = T)) install.packages('xlsx'); library('xlsx')
@@ -21,7 +21,7 @@ if (!require("factoextra")) install.packages("factoextra"); library(plotrix)
 
 # LOAD DATA etc. 
 
-df.attrs <- read.xlsx("cleaned_dataset_13Feb2022_notes_removed_control-2.xlsx", 
+df.attrs <- read.xlsx("data/cleaned_dataset_13Feb2022_notes_removed_control-2.xlsx", 
 											sheetIndex = 1)
 df.clean <- df.attrs
 
@@ -115,6 +115,17 @@ pharma = list("Pharmaceutical company funding" = "Pharmaceutical.company.funding
 
 outcome = list("Continuous abstinence" = "Abstinence..Continuous." ,                                    
 							 "Point prevalence abstinence" = "Abstinence..Point.Prevalence." )
+
+
+#### Set up interface to prediction system 
+library(reticulate)
+use_python("/Library/Frameworks/Python.framework/Versions/3.8/bin/python3")
+
+os <- import("os")
+os$chdir("/Users/hastingj/Work/Python/semantic-prediction")
+source_python('rulenn/ui_interface.py')
+initialise_model()
+
 
 # Define UI for app ----
 ui <- fluidPage(
@@ -225,11 +236,11 @@ ui <- fluidPage(
 				plotOutput(outputId = "predPlot"),
 			),
 			
-			column(4,
+			column(12,
 				fluidRow(htmlOutput("text")),
 			),
 			
-			column(8,
+			column(12,
 				plotOutput(outputId = "pcaPlot")
 			)
 		)
@@ -248,7 +259,6 @@ server <- function(input, output) {
 		test <- df.clean[1,]
 		
 		# Baseline
-		
 		test['document_id'] = 437572
 		test[['arm_id']]=0
 		test[['control']]=0
@@ -284,31 +294,140 @@ server <- function(input, output) {
 		return( list(test,control) )
 	}
 	
+	preparePredictionRules <- function(input) {
+		print(input)
+	
+		# Baseline
+
+		test <- c(input$meanAge <= 12, #'Mean age (child)',
+							input$meanAge <= 18, #'Mean age (adolecent)',
+							input$meanAge <= 25, #'Mean age (young adult)',
+							input$meanAge <= 60, #'Mean age (adult)',
+							input$meanAge >= 60, #'Mean age (elderly)',
+							"doctor" %in% input$source, #'doctor',
+							'Patch' %in% input$pharmacological, #'Patch',
+							0, #'control',
+							"X2.3.Self.monitoring.of.behavior" %in% input$intervention, #'2.3 Self-monitoring of behavior',
+							"Pill" %in% input$pharmacological, #'Pill',
+							"X4.1.Instruction.on.how.to.perform.the.behavior" %in% input$intervention, #'4.1 Instruction on how to perform the behavior',
+							"bupropion" %in% input$pharmacological, #'bupropion',
+							"nurse" %in% input$source, #'nurse',
+							"gum" %in% input$pharmacological, #'gum',
+							"X1.1.Goal.setting" %in% input$intervention, #'1.1.Goal setting',
+							"e_cigarette" %in% input$pharmacological, #'e_cigarette',
+							"placebo" %in% input$pharmacological, #'placebo',
+							"Website...Computer.Program...App" %in% input$delivery, #'Website / Computer Program / App',
+							"nrt" %in% input$pharmacological, #'nrt',
+							input$tobaccoUsed <=5, #'Mean number of times tobacco used (<= 5)',
+							input$tobaccoUsed <=10, #'Mean number of times tobacco used (<= 10)',
+							input$tobaccoUsed <=15, #'Mean number of times tobacco used (<= 15)',
+							input$tobaccoUsed <=20, #'Mean number of times tobacco used (<= 20)',
+							input$tobaccoUsed <=25, #'Mean number of times tobacco used (<= 25)',
+							input$tobaccoUsed >=26, #'Mean number of times tobacco used (> 26)',
+							0, #'healthcare facility',  ? not in interface yet ? 
+							"Pharmaceutical.company.competing.interest" %in% input$pharma, #'Pharmaceutical company competing interest',
+							"phone" %in% input$delivery, #'phone',
+							"Biochemical.verification" %in% input$outcome, #'Biochemical verification',
+							"X2.2.Feedback.on.behaviour" %in% input$intervention, #'2.2 Feedback on behaviour',
+							"Digital.content.type" %in% input$delivery, #'Digital content type',
+							"X3.1.Social.support" %in% input$intervention, #'3.1 Social support',
+							"Motivational.Interviewing" %in% input$intervention, #'Motivational Interviewing',
+							input$patientRole, #'aggregate patient role',
+							"Health.Professional" %in% input$source, #'Health Professional',
+							"X1.2.Problem.solving" %in% input$intervention, #'1.2 Problem solving',
+							"Pharmaceutical.company.funding" %in% input$pharma, #'Pharmaceutical company funding',
+							"nasal_spray" %in% input$pharmacological, #'nasal_spray',
+							"Abstinence..Point.Prevalence." %in% input$outcome, #'Abstinence: Point Prevalence ',
+							"inhaler" %in% input$pharmacological, #'inhaler',
+							"pychologist" %in% input$source, #'pychologist',
+							"X11.1.Pharmacological.support" %in% input$intervention, #'11.1 Pharmacological support',
+							"X11.2.Reduce.negative.emotions" %in% input$intervention, #'11.2 Reduce negative emotions',
+							"Face.to.face" %in% input$delivery, #'Face to face',
+							"varenicline" %in% input$pharmacological, #'varenicline',
+							input$followup<=1, #'Combined follow up (one week)',
+							input$followup<=4, #'Combined follow up (<= 1 month)',
+							input$followup<=32, #'Combined follow up (<= 8 months)',
+							input$followup<=60, #'Combined follow up (<= 15 month)',
+							input$followup<=80, #'Combined follow up (<= 20 months)',
+							input$followup<=112, #'Combined follow up (<= 28 months)',
+							input$followup>112, #'Combined follow up (> 29 months)',
+							"Group.based" %in% input$delivery, #'Group-based',
+							"X4.5..Advise.to.change.behavior" %in% input$intervention, #'4.5. Advise to change behavior',
+							"X5.3.Information.about.social.and.environmental.consequences" %in% input$intervention, #'5.3 Information about social and environmental consequences',
+							"X1.4.Action.planning" %in% input$intervention, #'1.4 Action planning',
+							"Printed.material" %in% input$delivery, #'Printed material',
+							"Abstinence..Continuous." %in% input$outcome, #'Abstinence: Continuous ',
+							input$proportionFemale==0, #'Proportion identifying as female gender (None)',
+							input$proportionFemale<=15, #'Proportion identifying as female gender (<= 15)',
+							input$proportionFemale<=35, #'Proportion identifying as female gender (<= 35)',
+							input$proportionFemale<=45, #'Proportion identifying as female gender (<= 45)',
+							input$proportionFemale<=60, #'Proportion identifying as female gender (<= 60)',
+							input$proportionFemale<=99, #'Proportion identifying as female gender (<= 99)',
+							input$proportionFemale==100, #'Proportion identifying as female gender (All)',
+							"CBT" %in% input$intervention, #'CBT',
+							1,#input$Individual.level.analysed<=100, #'Individual-level analysed (~100)',
+							1,#input$Individual.level.analysed<=500, #'Individual-level analysed (~500)',
+							0,#input$Individual.level.analysed<=1000, #'Individual-level analysed (~1000)',
+							0,#input$Individual.level.analysed<=3000, #'Individual-level analysed (~3000)',
+							0,#input$Individual.level.analysed<=15000, #'Individual-level analysed (~15000)',
+							"lozenge" %in% input$pharmacological, #'lozenge',
+							"Somatic" %in% input$pharmacological, #'Somatic',
+							"brief.advise" %in% input$intervention, #'brief advise',
+							"text.messaging" %in% input$delivery, #'text messaging',
+							"X5.1.Information.about.health.consequences" %in% input$delivery) #'5.1 Information about health consequences']
+		
+		control <- test
+		control[8] <- 1 # 'control'
+		control[c(6:19,
+							 28:33,
+							 35,36,
+							 38,
+							 40:45,
+							 53:57,
+							 66,
+							 72:76)] <- 0
+		
+		return( list(test,control) )
+	}
+	
 	output$text <- renderText(
-		{
-			vals = preparePrediction(input)
+		{ # The dataset we are expecting is 
+			
+			vals = preparePredictionRules(input)
+			
 			test  = vals[[1]]
+			print(test)
+			
 			control = vals[[2]]
+			print(control)
 			
-			pcacols <- c(3:46,48:54)
-			df.datavars <- df.clean[,pcacols]
-			rownames(df.datavars) <- paste(df.attrs$document,'-',df.attrs$arm)
+			#pcacols <- c(3:46,48:54)
+			#df.datavars <- df.clean[,pcacols]
+			#rownames(df.datavars) <- paste(df.attrs$document,'-',df.attrs$arm)
 			
-			pca <- prcomp(df.datavars,scale=T)
+			#pca <- prcomp(df.datavars,scale=T)
 			
-			testpoint <- predict(pca,newdata = test)
-			ctrlpoint <- predict(pca,newdata = control)
+			#testpoint <- predict(pca,newdata = test)
+			#ctrlpoint <- predict(pca,newdata = control)
 			
-			testdists <- as.numeric((pca$x[,1]-testpoint[1])^2
-															+(pca$x[,2]-testpoint[2])^2)
-			closesttests <- paste(rownames(pca$x)[order(testdists)][1:3],collapse='</li><li>')
-			ctrldists <- as.numeric((pca$x[,1]-ctrlpoint[1])^2
-															+(pca$x[,2]-ctrlpoint[2])^2)
-			closestctrls <- paste(rownames(pca$x)[order(ctrldists)][1:3],collapse='</li><li>')
+			#testdists <- as.numeric((pca$x[,1]-testpoint[1])^2
+			#												+(pca$x[,2]-testpoint[2])^2)
+			#closesttests <- paste(rownames(pca$x)[order(testdists)][1:3],collapse='</li><li>')
+			#ctrldists <- as.numeric((pca$x[,1]-ctrlpoint[1])^2
+			#												+(pca$x[,2]-ctrlpoint[2])^2)
+			#closestctrls <- paste(rownames(pca$x)[order(ctrldists)][1:3],collapse='</li><li>')
 			
 			#print(testdists)
 			
-			paste("<b>Closest to baseline: </b><br/><ul><li>",closestctrls,"</li></ul><br/><b>Closest to intervention: </b><br/><ul><li>",closesttests,"</li></ul>")  # Todo: Which is the most likely intervention to succeed for the given population/setting/etc? 
+			#paste("<b>Closest to baseline: </b><br/><ul><li>",closestctrls,"</li></ul><br/><b>Closest to intervention: </b><br/><ul><li>",closesttests,"</li></ul>")  # Todo: Which is the most likely intervention to succeed for the given population/setting/etc? 
+			
+			predtest <- get_prediction(test)
+			predctrl <- get_prediction(control)
+			
+			paste("Values: test ",predtest[1], ", control ",predctrl[1], '<br/><br/>',
+			"Test: ",paste(predtest[2],sep = '<br/>'),'<br/><br/>',
+			"Control: ",paste(predctrl[2],sep='<br/>') )
+			
 		}
 	)
 	
@@ -378,8 +497,4 @@ server <- function(input, output) {
 
 options(shiny.port = 5001)
 shinyApp(ui = ui, server = server)
-
-
-
-
 
