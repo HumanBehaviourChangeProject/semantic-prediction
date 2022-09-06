@@ -1,7 +1,10 @@
 import csv
+import typing
+
 from thefuzz import process as fw_process, fuzz
 import json
 from abc import ABC, abstractmethod
+import inspect
 
 _MAPPINGS = set()
 
@@ -35,7 +38,10 @@ def load_countries_and_cities():
 
 class AttributeCleaner(ABC):
     def __init_subclass__(cls, **kwargs):
-        _MAPPINGS.add(cls())
+        if not inspect.isabstract(cls):
+            _MAPPINGS.add(cls())
+        else:
+            print("Skipped abstract class", cls)
 
     @property
     def linked_attributes(self):
@@ -52,6 +58,10 @@ class AttributeCleaner(ABC):
         raise NotImplementedError
 
 class RoundingCleaner(AttributeCleaner):
+    """Casts values to numbers and rounds them to at most 3 decimal places. If
+there are multiple possible values, we attempt to find a rounding function
+that unifies all - e.g. ["2.51", "2.49999999"] will be unified and rounded
+to 2.5."""
     @property
     def linked_attributes(self):
         return (6080481, 6080485, 6080486, 6080512, 6080719)
@@ -67,6 +77,8 @@ class RoundingCleaner(AttributeCleaner):
                 )
                 if len(s) == 1:
                     return {ident: s.pop()}
+                elif len(s) > 1:
+                   print("Too many values", s)
         if v:
             return {ident: v}
         else:
@@ -74,6 +86,7 @@ class RoundingCleaner(AttributeCleaner):
 
 
 class PresenceCleaner(AttributeCleaner):
+    """ Any value will be considered as "presence"."""
     @property
     def linked_attributes(self):
         # Features that are commented out, are not present in the dataset
@@ -207,7 +220,10 @@ class PresenceCleaner(AttributeCleaner):
 
 
 class OutcomeValueCleaner(RoundingCleaner):
-
+    """ Outcome values that merges the values of the outcomes in the JSON-file
+and some manual corrections. If there are manual corrections, those take
+precedence over the JSON data.
+    """
     @property
     def linked_attributes(self):
         return (6451791,)
@@ -224,22 +240,9 @@ def _clean(x):
     return x.replace(",", "").replace(";", "").replace("-", "").replace(" ", "").lower()
 
 
-def _process_with_key_list(
-    ident, keys, data, initial_dictionary=None, threshold=90, negative=False
-):
-    if initial_dictionary:
-        d = dict(initial_dictionary)
-    else:
-        d = dict()
-    for x, _ in data.get(ident, tuple()):
-        for key, patterns in keys.items():
-            match = fw_process.extract(x, patterns)
-            if match[0][1] >= threshold:
-                d[key] = 1 if not negative else 0
-    return d
-
-
 class MotivationalIntervewingCleaner(AttributeCleaner):
+    """Classifies as "present" if any of the values contains anything that
+matches "brief advise" or "ba"."""
     @property
     def linked_attributes(self):
         return (6823487,)
@@ -258,6 +261,8 @@ class MotivationalIntervewingCleaner(AttributeCleaner):
 
 
 class DigitalContentCleaner(AttributeCleaner):
+    """Classifies as "present" if any of the values contains anything that
+matches "text" or "text message"."""
     @property
     def linked_attributes(self):
         return (6080691,)
@@ -276,6 +281,8 @@ class DigitalContentCleaner(AttributeCleaner):
 
 
 class DistanceCleaner(AttributeCleaner):
+    """Classifies as "present" if any of the values contains anything that
+matches "phone", "call", "telephone", "quitline" or "hotline"."""
     @property
     def linked_attributes(self):
         return (6080687,)
@@ -290,8 +297,44 @@ class DistanceCleaner(AttributeCleaner):
         return {"phone": phone}
 
 
-class SomaticCleaner(AttributeCleaner):
-    def __init__(self):
+class KeyBasedAttributeCleaner(AttributeCleaner):
+    def __init__(self, **kwargs):
+        self.__doc__ = self.docs
+    @property
+    def docs(self):
+        s = """Classifies as any of the following classes as "present" if any of assiciated values noted below is matched by a value:"""
+        lmax = max(map(len,self.keys()))
+        for key, values in self.keys().items():
+            s += "\n"
+            s += f"  * {key}: "
+            s += "".join(" " for _ in range(lmax - len(key)))
+            s += ', '.join(f'"{v}"' for v in values)
+        return s
+
+    def _process_with_key_list(
+            self, ident, data, initial_dictionary=None, threshold=90,
+            negative=False
+    ):
+        if initial_dictionary:
+            d = dict(initial_dictionary)
+        else:
+            d = dict()
+        for x, _ in data.get(ident, tuple()):
+            for key, patterns in self.keys().items():
+                match = fw_process.extract(x, patterns)
+                if match[0][1] >= threshold:
+                    d[key] = 1 if not negative else 0
+        return d
+
+    @abstractmethod
+    def keys(self) -> typing.Dict:
+        raise NotImplementedError
+
+
+class SomaticCleaner(KeyBasedAttributeCleaner):
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.any_as_presence = PresenceCleaner()
 
     @property
@@ -299,7 +342,18 @@ class SomaticCleaner(AttributeCleaner):
         return (6080693,)
 
     def get_value(self, ident, data):
-        keys = {
+        d = dict(
+            gum=0, lozenge=0, e_cigarette=0, inhaler=0, placebo=0, nasal_spray=0, nrt=0
+        )
+        d.update(self.any_as_presence.get_value(ident, data))
+        d = self._process_with_key_list(ident, data, initial_dictionary=d)
+        patch = self.any_as_presence.get_value(6080694, data)[6080694]
+        if d["gum"] or d["lozenge"] or d["e_cigarette"] or patch or d["inhaler"]:
+            d["nrt"] = 1
+        return d
+
+    def keys(self):
+        return {
             "gum": ["gum", "polacrilex"],
             "lozenge": ["lozenge"],
             "e_cigarette": ["ecig", "ecigarette"],
@@ -311,18 +365,17 @@ class SomaticCleaner(AttributeCleaner):
             "nrt": ["nicotine", "nrt"],
             "bupropion": ["bupropion"],
         }
-        d = dict(
-            gum=0, lozenge=0, e_cigarette=0, inhaler=0, placebo=0, nasal_spray=0, nrt=0
-        )
-        d.update(self.any_as_presence.get_value(ident, data))
-        d = _process_with_key_list(ident, keys, data, initial_dictionary=d)
-        patch = self.any_as_presence.get_value(6080694, data)[6080694]
-        if d["gum"] or d["lozenge"] or d["e_cigarette"] or patch or d["inhaler"]:
-            d["nrt"] = 1
-        return d
 
 
 class PillCleaner(AttributeCleaner):
+    """Looks for the following keywords:
+* bupropion:     "bupropion"
+* nortriptyline: "nortriptyline"
+* varenicline:   "varenicline", "varen", "chantix", "champix"
+
+For bupropion, it is also checked whether 6080693 contains "bupropion".
+    """
+
     def __init__(self):
         self.any_as_presence = PresenceCleaner()
 
@@ -357,8 +410,25 @@ class PillCleaner(AttributeCleaner):
         return d
 
 
-class HealthProfessionalCleaner(AttributeCleaner):
-    def __init__(self):
+class HealthProfessionalCleaner(KeyBasedAttributeCleaner):
+    def keys(self):
+        return {
+        "nurse": ["nurse"],
+        "doctor": [
+            "physician",
+            "doctor",
+            "physician",
+            "cardiologist",
+            "pediatrician",
+            "general pract",
+            "GP",
+            "resident",
+            "internal medicine",
+        ],
+    }
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.any_as_presence = PresenceCleaner()
 
     @property
@@ -366,60 +436,51 @@ class HealthProfessionalCleaner(AttributeCleaner):
         return (6080704,)
 
     def get_value(self, ident, data):
-        keys = {
-            "nurse": ["nurse"],
-            "doctor": [
-                "physician",
-                "doctor",
-                "physician",
-                "cardiologist",
-                "pediatrician",
-                "general pract",
-                "GP",
-                "resident",
-                "internal medicine",
-            ],
-        }
+
         d = self.any_as_presence.get_value(ident, data)
-        d = _process_with_key_list(ident, keys, data, initial_dictionary=d)
+        d = self._process_with_key_list(ident, data, initial_dictionary=d)
         return d
 
 
-class PsychologistCleaner(AttributeCleaner):
+class PsychologistCleaner(KeyBasedAttributeCleaner):
     @property
     def linked_attributes(self):
         return (6080706,)
 
     def get_value(self, ident, data):
-        keys = {"pychologist": ["pychologist", "psychol"]}
-        d = _process_with_key_list(ident, keys, data)
+        d = self._process_with_key_list(ident, data)
         return d
 
+    def keys(self):
+        return {"pychologist": ["pychologist", "psychol"]}
 
-class PatientRoleCleaner(AttributeCleaner):
+
+class PatientRoleCleaner(KeyBasedAttributeCleaner):
     @property
     def linked_attributes(self):
         return (6080508,)
 
     def get_value(self, ident, data):
-        keys = {"aggregate patient role": ["patient"]}
         d = {"aggregate patient role": 0}
-        d = _process_with_key_list(
-            ident, keys, data, initial_dictionary=d, threshold=80
+        d = self._process_with_key_list(
+            ident, data, initial_dictionary=d, threshold=80
         )
         return d
 
+    def keys(self) -> typing.Dict:
+        return {"aggregate patient role": ["patient"]}
 
-class HealthCareFacilityCleaner(AttributeCleaner):
+class HealthCareFacilityCleaner(KeyBasedAttributeCleaner):
     @property
     def linked_attributes(self):
         return (6080629,)
 
+    def keys(self):
+        return {"healthcare facility": ["smok"]}
+
     def get_value(self, ident, data):
-        keys = {"healthcare facility": ["smok"]}
-        d = _process_with_key_list(
+        d = self._process_with_key_list(
             ident,
-            keys,
             data,
             initial_dictionary={
                 "healthcare facility": 1 if data.get(ident, tuple()) else 0
@@ -440,6 +501,9 @@ def is_number(x):
 
 
 class PharmacologicalInterestCleaner(AttributeCleaner):
+    """Any value in 6830268 or 6830264 will be considered as "presence"."""
+
+
     def __init__(self):
         self.any_as_presence = PresenceCleaner()
 
@@ -455,6 +519,13 @@ class PharmacologicalInterestCleaner(AttributeCleaner):
 
 
 class TimePointCleaner(AttributeCleaner):
+    """Values from "Combined follow up" are extracted and, if present, overwritten
+by manual changes. Manual annotations are split into unit and value.
+The values are then normalised to "weeks" using the following factors:
+* days:   1/7
+* weeks:  1
+* months: 4.35
+* year:   12 * 4.35"""
     def __init__(self):
         self.use_rounded = RoundingCleaner()
 
@@ -479,7 +550,10 @@ class TimePointCleaner(AttributeCleaner):
                 raise Exception(f"Unknown unit {tpu[1]}")
             v =  float(tpv[1].replace(",",".")) * factor
         if v is not None:
-            values["Combined follow up"] = float(v)
+            try:
+                values["Combined follow up"] = float(v)
+            except TypeError:
+                del values["Combined follow up"]
         return values
 
     def get_value(self, ident, data):
@@ -492,6 +566,7 @@ class TimePointCleaner(AttributeCleaner):
 
 
 class CountryCleaner(AttributeCleaner):
+    """Countries are currently omitted"""
     def __init__(self):
         self.countries, self.city_dict = load_countries_and_cities()
 
@@ -525,7 +600,11 @@ class CountryCleaner(AttributeCleaner):
 
 
 class PregnancyTrialCleaner(AttributeCleaner):
+    """The kind of trial is encoded as follows:
+1 -> Pregnancy trial
+2 -> Pregnancy trial (Mixed)
 
+Individual features are introduced for each of these classes."""
     @property
     def linked_attributes(self):
         return tuple()
@@ -548,6 +627,11 @@ class PregnancyTrialCleaner(AttributeCleaner):
 
 
 class RelapsePreventionTrialCleaner(AttributeCleaner):
+    """The kind of trial is encoded as follows:
+1 -> Relapse Prevention Trial
+2 -> Relapse Prevention Trial (Mixed)
+
+Individual features are introduced for each of these classes."""
     @property
     def linked_attributes(self):
         return tuple()
@@ -587,3 +671,14 @@ def clean_row(row, diff):
             mapped_with_context = {k: mapped.get(k, 0) for k in mapped}
             values.update(mapped_with_context)
     return values
+
+
+def print_cleaners():
+    for m in _MAPPINGS:
+        print("# ", m.__class__.__name__)
+        print("*Description:* ", m.__doc__)
+        print()
+        print("This cleaner is applied to the following features: " + ", ".join(map(str,m.linked_attributes)))
+        print()
+if __name__ == "__main__":
+    print_cleaners()

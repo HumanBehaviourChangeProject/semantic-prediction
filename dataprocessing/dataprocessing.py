@@ -67,6 +67,8 @@ def main():
     feature_columns = [c[0] not in (6451791, 6080518) for c in ds.columns]
     features = ds.loc[:, feature_columns]
 
+    write_csv(features)
+
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
     write_fuzzy(features.astype(float), labels.astype(float))
