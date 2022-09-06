@@ -11,23 +11,6 @@ def write_csv(doc_attrs:pd.DataFrame):
         else:
             header.append(f"{b}({a})")
     doc_attrs.to_csv("features.csv", header=header, index_label=("document", "arm"))
-    return
-    with open("features.csv", "w") as fout:
-        writer = csv.writer(fout)
-        columns = list(
-            {
-                k
-                for _, arms in doc_attrs.items()
-                for _, sattr in arms.items()
-                for k in sattr.keys()
-                if k != 6080518 and k != 6451791
-            }
-        )
-        writer.writerow([attribute_name_map.get(c, c) for c in columns])
-        for doc_id, arms in doc_attrs.items():
-            for arm_id, sattr in arms.items():
-                writer.writerow([*(sattr.get(k, "-") for k in columns)])
-
 
 def write_fuzzy(features, labels):
     with open("data/hbcp_gen.pkl", "wb") as fout:

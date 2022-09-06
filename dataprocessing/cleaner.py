@@ -78,11 +78,11 @@ to 2.5."""
                 if len(s) == 1:
                     return {ident: s.pop()}
                 elif len(s) > 1:
-                   print("Too many values", s)
+                    print(f"Multiple values found in {ident}:", s)
         if v:
             return {ident: v}
         else:
-            return {ident:None}
+            return {}
 
 
 class PresenceCleaner(AttributeCleaner):
@@ -230,10 +230,11 @@ precedence over the JSON data.
 
     def apply_diff(self, values, diff):
         new_ov = diff.get("NEW Outcome value")
-        v = values[6451791]
+        v = values.get(6451791)
         if new_ov:
             v = new_ov[1]
-        values[6451791] = float(v.replace(",","."))
+        if v is not None:
+            values[6451791] = float(v.replace(",","."))
         return values
 
 def _clean(x):
