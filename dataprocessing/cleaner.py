@@ -69,6 +69,7 @@ to 2.5."""
     def get_value(self, ident, data):
         v = None
         if ident in data:
+            s = set()
             for i in reversed(range(0, 3)):
                 s = set(
                     round(float(x), i)
@@ -77,8 +78,8 @@ to 2.5."""
                 )
                 if len(s) == 1:
                     return {ident: s.pop()}
-                elif len(s) > 1:
-                    print(f"Multiple values found in {ident}:", s)
+            if len(s) > 1:
+                print(f"Multiple values found in {ident}:", s)
         if v:
             return {ident: v}
         else:
@@ -215,7 +216,7 @@ class PresenceCleaner(AttributeCleaner):
         if x:
             v = 1
         else:
-            v = 0
+            v = None
         return {ident: v}
 
 
@@ -249,8 +250,8 @@ matches "brief advise" or "ba"."""
         return (6823487,)
 
     def get_value(self, ident, data):
-        v = 0
-        brief = 0
+        v = None
+        brief = None
         for x, _ in data.get(ident, tuple()):
             match = fw_process.extract(x.lower(), ("brief advice", "ba"))
             if match[0][1] >= 80:
@@ -462,7 +463,7 @@ class PatientRoleCleaner(KeyBasedAttributeCleaner):
         return (6080508,)
 
     def get_value(self, ident, data):
-        d = {"aggregate patient role": 0}
+        d = {"aggregate patient role": None}
         d = self._process_with_key_list(
             ident, data, initial_dictionary=d, threshold=80
         )
@@ -611,12 +612,16 @@ Individual features are introduced for each of these classes."""
         return tuple()
 
     def get_value(self, ident, data):
+        return None
+
+    def apply_diff(self, values, diff):
         d = {
-            "Pregnancy trial": 0,
-            "Pregnancy trial (Mixed)": 0,
+            "Pregnancy trial": None,
+            "Pregnancy trial (Mixed)": None,
         }
-        v = data.get("Pregnancy trial 1 = yes, 2 = mix pg and non-pg")
+        v = diff.get("Pregnancy trial 1 = yes, 2 = mix pg and non-pg")
         if v is not None:
+            v = v[1]
             if v == "1":
                 d["Pregnancy trial"] = 1
             elif v == "2":
@@ -638,12 +643,16 @@ Individual features are introduced for each of these classes."""
         return tuple()
 
     def get_value(self, ident, data):
+        return None
+
+    def apply_diff(self, values, diff):
         d = {
-            "Relapse Prevention Trial": 0,
-            "Relapse Prevention Trial(Mixed)": 0,
+            "Relapse Prevention Trial": None,
+            "Relapse Prevention Trial(Mixed)": None,
         }
-        v = data.get("Relapse prevention trial (1 = yes, 2 = mix of quitters and non-abstinent)")
+        v = diff.get("Relapse prevention trial (1 = yes, 2 = mix of quitters and non-abstinent)")
         if v is not None:
+            v = v[1]
             if v == "1":
                 d["Relapse Prevention Trial"] = 1
             elif v == "2":
@@ -669,8 +678,12 @@ def clean_row(row, diff):
     for cleaner in _MAPPINGS:
         for attribute_id in cleaner.linked_attributes:
             mapped = cleaner(attribute_id, row, diff)
-            mapped_with_context = {k: mapped.get(k, 0) for k in mapped}
+            mapped_with_context = {k: mapped.get(k, None) for k in mapped}
             values.update(mapped_with_context)
+    p1 = PregnancyTrialCleaner()
+    values.update(p1(None, row, diff))
+    p2 = RelapsePreventionTrialCleaner()
+    values.update(p2(None, row, diff))
     return values
 
 

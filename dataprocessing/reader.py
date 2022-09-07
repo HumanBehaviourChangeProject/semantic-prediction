@@ -127,7 +127,7 @@ class AttributeReader(BaseReader):
                 (k, attribute_names.get(k, k)): v for k, v in clean_row(attrs, differ.get_diff(get_id(a),get_id(b))).items()
             }
             for a, arms in doc_attrs.items()
-            if not dropper.should_be_dropped(get_id(a))
+            if not dropper.should_be_dropped(get_id(a)) and not print("---\n",a)
             for b, attrs in arms.items()
         }
         return pd.DataFrame(d).T
