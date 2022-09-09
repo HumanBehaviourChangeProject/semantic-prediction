@@ -477,6 +477,9 @@ class HealthCareFacilityCleaner(KeyBasedAttributeCleaner):
     def linked_attributes(self):
         return (6080629,)
 
+    def docs(self):
+        return """ Any value will be considered as "presence", unless their value starts with "smok"."""
+
     def keys(self):
         return {"healthcare facility": ["smok"]}
 
@@ -668,11 +671,11 @@ def get_id(s):
 
 def clean_row(row, diff):
     values = {
-        "bupropion": 0,
-        "varenicline": 0,
-        "pychologist": 0,
-        "doctor": 0,
-        "nurse": 0,
+        "bupropion": None,
+        "varenicline": None,
+        "pychologist": None,
+        "doctor": None,
+        "nurse": None,
     }
 
     for cleaner in _MAPPINGS:

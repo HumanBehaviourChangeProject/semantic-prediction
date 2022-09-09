@@ -10,7 +10,7 @@ def write_csv(doc_attrs:pd.DataFrame):
             header.append(a)
         else:
             header.append(f"{b}({a})")
-    doc_attrs.to_csv("features.csv", header=header, index_label=("document", "arm"), na_rep="-")
+    doc_attrs.to_csv("data/model_input_data.csv", header=header, index_label=("document", "arm"), na_rep="-")
 
 def write_fuzzy(features, labels):
     with open("data/hbcp_gen.pkl", "wb") as fout:

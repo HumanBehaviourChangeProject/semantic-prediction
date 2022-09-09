@@ -14,7 +14,7 @@ from writer import write_csv, write_fuzzy
 from cleaner import is_number
 from reader import AttributeReader
 from abc import ABC, abstractmethod
-
+from collections import Counter
 
 class Processor(ABC):
     @abstractmethod
@@ -56,11 +56,18 @@ class Fuzzyfier:
         new_features = pd.DataFrame(inflated_data, index=features.index, columns=names)
         return new_features, labels
 
+def _at_least_10(collection):
+    c = Counter(collection)
+    if len(c.keys()) == 2:
+        return all(vs >= 10 for vs in c.values())
+    return True
 
 def main():
     reader = AttributeReader()
     ds = reader.read()
     print("Build fuzzy dataset")
+
+    ds[ds.isna()] = None
 
     write_csv(ds)
 
@@ -72,6 +79,9 @@ def main():
 
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
+
+    keep = features.aggregate(_at_least_10, axis=0)
+
     write_fuzzy(features.astype(float), labels.astype(float))
 
 
