@@ -24,7 +24,7 @@ class TrapezoidFuzzySet(FuzzySet):
             return 0
         elif v < self.l:
             return (v - self.l0) / (self.l - self.l0)
-        elif v < self.r:
+        elif v <= self.r:
             return 1
         elif v < self.r0:
             return (v - self.r0) / (self.r - self.r0)
@@ -120,8 +120,8 @@ FUZZY_SETS = {
         "elderly": OpenTrapezoidFuzzySet(100, 100),
     },
     "Combined follow up": {
-        "one week": OpenTrapezoidFuzzySet(1, 2),
-        "<= 1 month": OpenTrapezoidFuzzySet(3, 4),
+        #"one week": OpenTrapezoidFuzzySet(1, 2),
+        "<= 1 month": OpenTrapezoidFuzzySet(4.35, 1.5*4.35),
         "<= 8 months": OpenTrapezoidFuzzySet(8 * 4.35, 9 * 4.35),
         "<= 15 month": OpenTrapezoidFuzzySet(15 * 4.35, 16 * 4.35),
         "<= 20 months": OpenTrapezoidFuzzySet(20 * 4.35, 21 * 4.35),

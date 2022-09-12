@@ -291,7 +291,7 @@ matches "phone", "call", "telephone", "quitline" or "hotline"."""
 
     def get_value(self, ident, data):
         keys = ("phone", "call", "telephone", "quitline", "hotline")
-        phone = 0
+        phone = None
         for x, _ in data.get(ident, tuple()):
             match = fw_process.extract(x, keys)
             if match[0][1] >= 90:
@@ -345,7 +345,7 @@ class SomaticCleaner(KeyBasedAttributeCleaner):
 
     def get_value(self, ident, data):
         d = dict(
-            gum=0, lozenge=0, e_cigarette=0, inhaler=0, placebo=0, nasal_spray=0, nrt=0
+            gum=None, lozenge=None, e_cigarette=None, inhaler=None, placebo=None, nasal_spray=None, nrt=None
         )
         d.update(self.any_as_presence.get_value(ident, data))
         d = self._process_with_key_list(ident, data, initial_dictionary=d)
@@ -488,7 +488,7 @@ class HealthCareFacilityCleaner(KeyBasedAttributeCleaner):
             ident,
             data,
             initial_dictionary={
-                "healthcare facility": 1 if data.get(ident, tuple()) else 0
+                "healthcare facility": 1 if data.get(ident, tuple()) else None
             },
             negative=True,
         )
@@ -665,8 +665,13 @@ Individual features are introduced for each of these classes."""
 
         return d
 
+
 def get_id(s):
     return int(s.split("___")[1])
+
+
+def get_name(s):
+    return int(s.split("___")[0])
 
 
 def clean_row(row, diff):

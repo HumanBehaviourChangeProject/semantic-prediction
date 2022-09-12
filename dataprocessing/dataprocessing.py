@@ -69,6 +69,9 @@ def main():
 
     ds[ds.isna()] = None
 
+    # Sort columns
+    ds = ds[sorted(ds.columns, key=lambda x: str(x[1]))]
+
     write_csv(ds)
 
     labels = ds[6451791]
@@ -76,6 +79,14 @@ def main():
     features = ds.loc[:, feature_columns]
 
     write_csv(features)
+
+    female = (6080485, "Proportion identifying as female gender")
+    male = (6080486, "Proportion identifying as male gender")
+
+    features[female][features[female].isnull()] = 100*features[("Pregnancy trial", "Pregnancy trial")][features[female].isnull()]
+
+    features[female][features[female].isnull()] = 100 - features[male][features[female].isnull()]
+    features[male][features[male].isnull()] = 100 - features[female][features[male].isnull()]
 
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
