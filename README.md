@@ -13,3 +13,8 @@ We aim to develop an interpretable system for prediction of outcomes from behavi
   `python.py rulenn/rule_nn.py data/hbcp_gen.pkl`
   
   The rules that have been trained should then be available under `results/rules.txt`. Rules are separated by semicolons. The last element of each rule is the rule weight.
+
+# Data cleaning
+
+The mechanisms used for data cleaning are documented in [docs/cleaner.md](docs/cleaner.md)
+

@@ -3,16 +3,14 @@ import pickle
 import numpy as np
 import pandas as pd
 
-
-def write_csv(data:pd.DataFrame):
-
-    with open("features.csv", "w") as fout:
-        writer = csv.writer(fout)
-        columns = ["document", "arm"] + [c[1] for c in data.columns]
-        writer.writerow(columns)
-        for row in data.iterrows():
-            writer.writerow([*(str(v) for v in row[0]),*(str(v) if not pd.isna(v) else "-" for v in row[1])])
-
+def write_csv(doc_attrs:pd.DataFrame):
+    header = []
+    for a,b in doc_attrs.columns:
+        if a == b:
+            header.append(a)
+        else:
+            header.append(f"{b}({a})")
+    doc_attrs.to_csv("data/model_input_data.csv", header=header, index_label=("document", "arm"), na_rep="-")
 
 def write_fuzzy(features, labels):
     with open("data/hbcp_gen.pkl", "wb") as fout:
