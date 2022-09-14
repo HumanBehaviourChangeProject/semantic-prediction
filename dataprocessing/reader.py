@@ -2,7 +2,7 @@ import json
 import csv
 import pandas as pd
 from abc import ABC, abstractmethod
-from cleaner import clean_row, get_id, PregnancyTrialCleaner, RelapsePreventionTrialCleaner, Differ, Dropper
+from cleaner import clean_row, get_id, Differ, Dropper
 from thefuzz import fuzz
 
 

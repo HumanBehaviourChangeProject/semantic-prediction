@@ -14,7 +14,7 @@ from writer import write_csv, write_fuzzy
 from cleaner import is_number
 from reader import AttributeReader
 from abc import ABC, abstractmethod
-
+from collections import Counter
 
 class Processor(ABC):
     @abstractmethod
@@ -56,11 +56,21 @@ class Fuzzyfier:
         new_features = pd.DataFrame(inflated_data, index=features.index, columns=names)
         return new_features, labels
 
+def _at_least_10(collection):
+    c = Counter(collection)
+    if len(c.keys()) == 2:
+        return all(vs >= 10 for vs in c.values())
+    return True
 
 def main():
     reader = AttributeReader()
     ds = reader.read()
     print("Build fuzzy dataset")
+
+    ds[ds.isna()] = None
+
+    # Sort columns
+    ds = ds[sorted(ds.columns, key=lambda x: str(x[1]))]
 
     write_csv(ds)
 
@@ -68,8 +78,21 @@ def main():
     feature_columns = [c[0] not in (6451791, 6080518) for c in ds.columns]
     features = ds.loc[:, feature_columns]
 
+    write_csv(features)
+
+    female = (6080485, "Proportion identifying as female gender")
+    male = (6080486, "Proportion identifying as male gender")
+
+    features[female][features[female].isnull()] = 100*features[("Pregnancy trial", "Pregnancy trial")][features[female].isnull()]
+
+    features[female][features[female].isnull()] = 100 - features[male][features[female].isnull()]
+    features[male][features[male].isnull()] = 100 - features[female][features[male].isnull()]
+
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
+
+    keep = features.aggregate(_at_least_10, axis=0)
+
     write_fuzzy(features.astype(float), labels.astype(float))
 
 
