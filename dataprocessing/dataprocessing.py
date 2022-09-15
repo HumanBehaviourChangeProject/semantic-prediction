@@ -78,8 +78,6 @@ def main():
     feature_columns = [c[0] not in (6451791, 6080518) for c in ds.columns]
     features = ds.loc[:, feature_columns]
 
-    write_csv(features)
-
     female = (6080485, "Proportion identifying as female gender")
     male = (6080486, "Proportion identifying as male gender")
 
