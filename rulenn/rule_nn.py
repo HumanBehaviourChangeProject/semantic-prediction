@@ -175,15 +175,16 @@ def calculate_pure_fit(w, fltr):
 
 
 def get_data_split(features, labels, seed=None):
-    documents = list(i[0] for i in features.index)
+    idx = list(features.index)
+    documents = list({i[0] for i in idx})
     random.shuffle(documents)
 
-    train_doc_index, val_doc_index = train_test_split(list(documents), random_state=seed, train_size=0.8)
-    test_doc_index, val_doc_index = train_test_split(val_doc_index, random_state=seed, train_size=0.6)
+    train_doc_index, val_doc_index = train_test_split(list(documents), random_state=seed, train_size=0.7)
+    test_doc_index, val_doc_index = train_test_split(val_doc_index, random_state=seed, train_size=0.5)
 
-    train_index = [i for i, t in enumerate(features.index) if t[0] in train_doc_index]
-    test_index = [i for i, t in enumerate(features.index) if t[0] in test_doc_index]
-    val_index = [i for i, t in enumerate(features.index) if t[0] in val_doc_index]
+    train_index = [i for i, t in enumerate(idx) if t[0] in train_doc_index]
+    test_index = [i for i, t in enumerate(idx) if t[0] in test_doc_index]
+    val_index = [i for i, t in enumerate(idx) if t[0] in val_doc_index]
 
     return train_index, test_index, val_index
 
@@ -212,7 +213,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
     )
     conjs = torch.diag(10 * torch.ones(len(pre)))
     conjs = torch.cat((conjs, torch.zeros_like(conjs, requires_grad=True)), dim=-1)
-    net = RuleNet(features.shape[1], 53, 3, append=(conjs, pre))
+    net = RuleNet(features.shape[1], 200, 3)
     net.to(device)
     criterion = nn.MSELoss()
     val_criterion = nn.L1Loss()
@@ -248,7 +249,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
             outputs = net(features[batch_index])
             w = net.non_lin(net.conjunctions)
             base_loss = criterion(outputs, batch_labels)
-            non_crips_penalty = 50 * e * torch.sum(
+            non_crips_penalty = 20 * e * torch.sum(
                 torch.sum(w * (1 - w), dim=-1), dim=0
             )  # penalty for non-crisp rules
             m = torch.max(
@@ -309,7 +310,7 @@ def main(epochs, features, labels, train_index, val_index, variables, device, fr
         # print statistics
         if epoch % 10 == 0:
             print(
-                f"{{epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\tval_alt: {val_rmse.item():.2f},\te: {e}}}"
+                f"{{epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\tval_rmse: {val_loss.item()**0.5:.2f},\tval_mae: {val_rmse.item():.2f},\te: {e}}}"
             )
             running_loss = 0.0
             running_penalties = 0.0
@@ -337,7 +338,7 @@ if __name__ == "__main__":
         features, labels = pickle.load(fin)
     rename = [x[1] for x in features.columns]
     index = np.array(features.index)
-    cross_val(
+    single_run(
         int(sys.argv[1]),
         features,
         labels,
