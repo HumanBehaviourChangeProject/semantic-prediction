@@ -24,7 +24,7 @@ class TrapezoidFuzzySet(FuzzySet):
             return 0
         elif v < self.l:
             return (v - self.l0) / (self.l - self.l0)
-        elif v < self.r:
+        elif v <= self.r:
             return 1
         elif v < self.r0:
             return (v - self.r0) / (self.r - self.r0)
@@ -36,13 +36,13 @@ class TrapezoidFuzzySet(FuzzySet):
             if fs.r0 == fs.r:
                 sns.lineplot(x=[self.l, self.r], y=[1, 1], label=label)
             else:
-                sns.lineplot(x=[self.l, self.r, self.r0], y=[1, 1, 0],
-                             label=label)
+                sns.lineplot(x=[self.l, self.r, self.r0], y=[1, 1, 0], label=label)
         elif fs.r0 == fs.r:
             sns.lineplot(x=[self.l0, self.l, self.r], y=[0, 1, 1], label=label)
         else:
-            sns.lineplot(x=[self.l0, self.l, self.r, self.r0], y=[0, 1, 1, 0],
-                         label=label)
+            sns.lineplot(
+                x=[self.l0, self.l, self.r, self.r0], y=[0, 1, 1, 0], label=label
+            )
 
 
 class OpenTrapezoidFuzzySet(FuzzySet):
@@ -66,13 +66,15 @@ class OpenTrapezoidFuzzySet(FuzzySet):
         if self.r0 == self.r:
             sns.lineplot(x=[0, self.r], y=[1, 1], label=label)
         else:
-            sns.lineplot(x=[0, self.r, self.r0], y=[1, 1, 0],
-                         label=label)
+            sns.lineplot(x=[0, self.r, self.r0], y=[1, 1, 0], label=label)
 
-class Verum(TrapezoidFuzzySet):
 
-    def __init__(self, l,r):
-        super().__init__(l,l,r,r)
+class Verum(FuzzySet):
+    def __init__(self, l, r):
+        pass
+
+    def __call__(self, v):
+        return 1
 
 class RadialFuzzySet(FuzzySet):
     def __init__(self, centers, index):
@@ -87,10 +89,9 @@ class RadialFuzzySet(FuzzySet):
         return p[self.index]
 
     def plot(self, canvas, label):
-        x = np.arange(0,max(self.c)*1.5)
-        y=self._call_wrapped(x)
+        x = np.arange(0, max(self.c) * 1.5)
+        y = self._call_wrapped(x)
         sns.lineplot(x=x, y=y, label=label)
-
 
 
 female_centers = np.array(
@@ -99,6 +100,16 @@ female_centers = np.array(
 individual_analysed = np.array(
     [[104.48384197], [537.95792884], [1233.74699616], [3393.28183401], [14055.32421329]]
 )
+
+gendersets = {
+        "None": OpenTrapezoidFuzzySet(0, 1),
+        "<= 15": OpenTrapezoidFuzzySet(15, 20),
+        "<= 35": OpenTrapezoidFuzzySet(35, 40),
+        "<= 45": OpenTrapezoidFuzzySet(45, 50),
+        "<= 60": OpenTrapezoidFuzzySet(60, 65),
+        "<= 99": OpenTrapezoidFuzzySet(99, 99),
+        "All": TrapezoidFuzzySet(99, 99, 100, 100),
+    }
 
 FUZZY_SETS = {
     "Mean age": {
@@ -109,13 +120,13 @@ FUZZY_SETS = {
         "elderly": OpenTrapezoidFuzzySet(100, 100),
     },
     "Combined follow up": {
-        "one week": OpenTrapezoidFuzzySet(1, 2),
-        "<= 1 month": OpenTrapezoidFuzzySet(3, 4),
+        #"one week": OpenTrapezoidFuzzySet(1, 2),
+        "<= 1 month": OpenTrapezoidFuzzySet(4.35, 1.5*4.35),
         "<= 8 months": OpenTrapezoidFuzzySet(8 * 4.35, 9 * 4.35),
         "<= 15 month": OpenTrapezoidFuzzySet(15 * 4.35, 16 * 4.35),
         "<= 20 months": OpenTrapezoidFuzzySet(20 * 4.35, 21 * 4.35),
         "<= 28 months": OpenTrapezoidFuzzySet(28 * 4.35, 29 * 4.35),
-        "> 29 months": Verum(0, 29 * 4.35),
+        "Reported": Verum(0, 29 * 4.35),
     },
     "Mean number of times tobacco used": {
         "<= 5": OpenTrapezoidFuzzySet(5, 6),
@@ -123,23 +134,16 @@ FUZZY_SETS = {
         "<= 15": OpenTrapezoidFuzzySet(15, 16),
         "<= 20": OpenTrapezoidFuzzySet(20, 21),
         "<= 25": OpenTrapezoidFuzzySet(25, 26),
-        "> 26": Verum(0, 26),
+        "Reported": Verum(0, 26),
     },
-    "Proportion identifying as female gender": {
-        "None": OpenTrapezoidFuzzySet(0, 1),
-        "<= 15": OpenTrapezoidFuzzySet(15, 20),
-        "<= 35": OpenTrapezoidFuzzySet(35, 40),
-        "<= 45": OpenTrapezoidFuzzySet(45, 50),
-        "<= 60": OpenTrapezoidFuzzySet(60, 65),
-        "<= 99": OpenTrapezoidFuzzySet(99, 99),
-        "All": TrapezoidFuzzySet(99, 99, 100, 100),
-    },
+    "Proportion identifying as female gender": gendersets,
+    "Proportion identifying as male gender": gendersets,
     "Individual-level analysed": {
-        "~100": RadialFuzzySet(individual_analysed, 0),
-        "~500": RadialFuzzySet(individual_analysed, 1),
-        "~1000": RadialFuzzySet(individual_analysed, 2),
-        "~3000": RadialFuzzySet(individual_analysed, 3),
-        "~15000": RadialFuzzySet(individual_analysed, 4),
+        "<= 300": OpenTrapezoidFuzzySet(250, 300),
+        "<= 800": OpenTrapezoidFuzzySet(700, 800),
+        "<= 2500": OpenTrapezoidFuzzySet(2000, 2500),
+        "<= 10000": OpenTrapezoidFuzzySet(9000, 10000),
+        "<= 30000": OpenTrapezoidFuzzySet(25000, 30000),
     },
 }
 
