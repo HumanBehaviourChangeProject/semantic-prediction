@@ -512,7 +512,7 @@ class PsychologistCleaner(KeyBasedAttributeCleaner):
         return d
 
     def keys(self):
-        return {"pychologist": ["pychologist", "psychol"]}
+        return {"psychologist": ["psychologist", "psychol"]}
 
 
 class PatientRoleCleaner(KeyBasedAttributeCleaner):
