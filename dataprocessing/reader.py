@@ -2,7 +2,7 @@ import json
 import csv
 import pandas as pd
 from abc import ABC, abstractmethod
-from cleaner import clean_row, get_id, Differ, Dropper
+from cleaner import clean_row, get_id, get_name, Differ, Dropper
 from thefuzz import fuzz
 
 
@@ -123,8 +123,8 @@ class AttributeReader(BaseReader):
         differ = Differ()
         dropper = Dropper()
         d = {
-            (get_id(a), get_id(b)): {
-                (k, attribute_names.get(k, k)): v for k, v in clean_row(attrs, differ.get_diff(get_id(a),get_id(b))).items()
+            (get_id(a), get_id(b), get_name(a), get_name(b)): {
+                (k, attribute_names.get(k, k)): v for k, v in clean_row(attrs, differ.get_diff(get_id(a),get_id(b)), get_name(b)).items()
             }
             for a, arms in doc_attrs.items()
             if not dropper.should_be_dropped(get_id(a))

@@ -20,11 +20,37 @@ class Dropper:
 
 class Differ:
     def __init__(self):
-        with open("data/diff.json", "r") as fin:
-            self.diff = json.load(fin)
+        with open("data/diff.csv", "r") as fin:
+            reader = csv.reader(fin)
+            self.diff = dict()
+            header = next(reader)
+            attributes = set(x.removesuffix("_old").removesuffix("_new") for x in header)
+            attributes.remove("document_id")
+            attributes.remove("arm_id")
+            for line in reader:
+                d = dict(zip(header, line))
+                d_new = dict()
+                for a in attributes:
+                    a_old = a+"_old"
+                    a_new = a + "_new"
+                    v_old= self.sanitize(d[a_old])
+                    v_new = self.sanitize(d[a_new])
+                    if v_old != v_new:
+                        d_new[a] = (v_old, v_new)
+                self.diff[(int(d["document_id"]), int(d["arm_id"]))] = d_new
+
+    @staticmethod
+    def sanitize(v):
+        if v == "" or v is None:
+            return None
+        else:
+            try:
+                return float(v.replace(",", "."))
+            except:
+                return v
 
     def get_diff(self, doc_id, arm_id):
-        return self.diff[str(doc_id)][str(arm_id)]
+        return self.diff[(doc_id, arm_id)]
 
 
 def load_countries_and_cities():
@@ -47,14 +73,21 @@ class AttributeCleaner(ABC):
     def linked_attributes(self):
         raise NotImplementedError
 
-    def __call__(self, ident, data, diff):
-        return self.apply_diff(self.get_value(ident, data), diff)
+    def __call__(self, ident, data, diff, arm_name):
+        return self.apply_diff(ident, self.get_value(ident, data, arm_name), diff)
 
-    def apply_diff(self, values, diff):
+    def apply_diff(self, ident, values, diff):
+        diff_vals = diff.get(str(ident))
+        orig_vals = values.get(ident)
+        if diff_vals is not None:
+            if (diff_vals[0] != orig_vals) and (not (diff_vals[0] == 0 and orig_vals is None)) and (diff_vals[1] != orig_vals):
+                print(f"Diff missmatch at {ident}: ", orig_vals, " != ", diff_vals)
+            else:
+                values[ident] = diff_vals[1]
         return values
 
     @abstractmethod
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         raise NotImplementedError
 
 class RoundingCleaner(AttributeCleaner):
@@ -66,7 +99,7 @@ to 2.5."""
     def linked_attributes(self):
         return (6080481, 6080485, 6080486, 6080512, 6080719)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         v = None
         if ident in data:
             s = set()
@@ -209,9 +242,11 @@ class PresenceCleaner(AttributeCleaner):
             6080694,
             6080688,
             6830264,
+            "Abstinence: Point Prevalence ",
+            "Abstinence: Continuous ",
         )
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         x = data.get(ident, False)
         if x:
             v = 1
@@ -229,13 +264,13 @@ precedence over the JSON data.
     def linked_attributes(self):
         return (6451791,)
 
-    def apply_diff(self, values, diff):
+    def apply_diff(self, ident, values, diff):
         new_ov = diff.get("NEW Outcome value")
         v = values.get(6451791)
         if new_ov:
             v = new_ov[1]
         if v is not None:
-            values[6451791] = float(v.replace(",","."))
+            values[6451791] = v
         return values
 
 def _clean(x):
@@ -249,7 +284,7 @@ matches "brief advise" or "ba"."""
     def linked_attributes(self):
         return (6823487,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         v = None
         brief = None
         for x, _ in data.get(ident, tuple()):
@@ -269,7 +304,7 @@ matches "text" or "text message"."""
     def linked_attributes(self):
         return (6080691,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         v = 0
         text_message = 0
         for x, _ in data.get(ident, tuple()):
@@ -289,7 +324,7 @@ matches "phone", "call", "telephone", "quitline" or "hotline"."""
     def linked_attributes(self):
         return (6080687,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         keys = ("phone", "call", "telephone", "quitline", "hotline")
         phone = None
         for x, _ in data.get(ident, tuple()):
@@ -315,18 +350,21 @@ class KeyBasedAttributeCleaner(AttributeCleaner):
 
     def _process_with_key_list(
             self, ident, data, initial_dictionary=None, threshold=90,
-            negative=False
+            negative=False, arm_name=None
     ):
         if initial_dictionary:
             d = dict(initial_dictionary)
         else:
             d = dict()
-        for x, _ in data.get(ident, tuple()):
+        for x, _ in data.get(ident, self._fallback_values(ident, data, arm_name)):
             for key, patterns in self.keys().items():
-                match = fw_process.extract(x, patterns)
-                if match[0][1] >= threshold:
+                match = max(fuzz.partial_ratio(x.lower(), p.lower()) for p in patterns)
+                if match >= threshold:
                     d[key] = 1 if not negative else 0
         return d
+
+    def _fallback_values(self, ident, data, arm_name):
+        return tuple()
 
     @abstractmethod
     def keys(self) -> typing.Dict:
@@ -343,13 +381,15 @@ class SomaticCleaner(KeyBasedAttributeCleaner):
     def linked_attributes(self):
         return (6080693,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         d = dict(
             gum=None, lozenge=None, e_cigarette=None, inhaler=None, placebo=None, nasal_spray=None, nrt=None
         )
-        d.update(self.any_as_presence.get_value(ident, data))
+        if fuzz.partial_ratio(arm_name, "placebo") > 80:
+            d['placebo'] = 1
+        d.update(self.any_as_presence.get_value(ident, data, arm_name))
         d = self._process_with_key_list(ident, data, initial_dictionary=d)
-        patch = self.any_as_presence.get_value(6080694, data)[6080694]
+        patch = self.any_as_presence.get_value(6080694, data, arm_name)[6080694]
         if d["gum"] or d["lozenge"] or d["e_cigarette"] or patch or d["inhaler"]:
             d["nrt"] = 1
         return d
@@ -369,6 +409,24 @@ class SomaticCleaner(KeyBasedAttributeCleaner):
         }
 
 
+class ControlCleaner(KeyBasedAttributeCleaner):
+    def keys(self):
+        return {
+            "control": ["control", "usual", "standard", "comparison", "normal"],
+        }
+
+    def get_value(self, ident, data, arm_name):
+        d = self._process_with_key_list(ident, data, initial_dictionary=dict(control=None), arm_name=arm_name)
+        return d
+
+    def _fallback_values(self, ident, data, arm_name):
+        return ((arm_name, None), )
+
+    @property
+    def linked_attributes(self):
+        return tuple()
+
+
 class PillCleaner(AttributeCleaner):
     """Looks for the following keywords:
 * bupropion:     "bupropion"
@@ -385,7 +443,7 @@ For bupropion, it is also checked whether 6080693 contains "bupropion".
     def linked_attributes(self):
         return (6080695,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         keys = {
             "bupropion": (
                 ["bupropion"],
@@ -403,7 +461,7 @@ For bupropion, it is also checked whether 6080693 contains "bupropion".
                 False,
             ),
         }
-        d = self.any_as_presence.get_value(ident, data)
+        d = self.any_as_presence.get_value(ident, data, arm_name)
         for x, _ in data.get(ident, tuple()):
             for key, (patterns, ands, ors) in keys.items():
                 match = fw_process.extract(x, patterns)
@@ -437,9 +495,9 @@ class HealthProfessionalCleaner(KeyBasedAttributeCleaner):
     def linked_attributes(self):
         return (6080704,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
 
-        d = self.any_as_presence.get_value(ident, data)
+        d = self.any_as_presence.get_value(ident, data, arm_name)
         d = self._process_with_key_list(ident, data, initial_dictionary=d)
         return d
 
@@ -449,7 +507,7 @@ class PsychologistCleaner(KeyBasedAttributeCleaner):
     def linked_attributes(self):
         return (6080706,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         d = self._process_with_key_list(ident, data)
         return d
 
@@ -462,7 +520,7 @@ class PatientRoleCleaner(KeyBasedAttributeCleaner):
     def linked_attributes(self):
         return (6080508,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         d = {"aggregate patient role": None}
         d = self._process_with_key_list(
             ident, data, initial_dictionary=d, threshold=80
@@ -483,7 +541,7 @@ class HealthCareFacilityCleaner(KeyBasedAttributeCleaner):
     def keys(self):
         return {"healthcare facility": ["smok"]}
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         d = self._process_with_key_list(
             ident,
             data,
@@ -508,7 +566,6 @@ def is_number(x):
 class PharmacologicalInterestCleaner(AttributeCleaner):
     """Any value in 6830268 or 6830264 will be considered as "presence"."""
 
-
     def __init__(self):
         self.any_as_presence = PresenceCleaner()
 
@@ -516,10 +573,10 @@ class PharmacologicalInterestCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6830268,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         return {
-            ident: self.any_as_presence.get_value(ident, data).get(ident, 0)
-            or self.any_as_presence.get_value(6830264, data).get(6830264, 0)
+            ident: self.any_as_presence.get_value(ident, data, arm_name).get(ident, 0)
+            or self.any_as_presence.get_value(6830264, data, arm_name).get(6830264, 0)
         }
 
 
@@ -538,7 +595,7 @@ The values are then normalised to "weeks" using the following factors:
     def linked_attributes(self):
         return (6451782,)
 
-    def apply_diff(self, values, diff):
+    def apply_diff(self, ident, values, diff):
         v = values.get("Combined follow up")
         tpv = diff.get("Manually added follow-up duration value")
         tpu = diff.get("Manually added follow-up duration units")
@@ -553,7 +610,7 @@ The values are then normalised to "weeks" using the following factors:
                 factor = 4.35*12
             else:
                 raise Exception(f"Unknown unit {tpu[1]}")
-            v =  float(tpv[1].replace(",",".")) * factor
+            v = tpv[1] * factor
         if v is not None:
             try:
                 values["Combined follow up"] = float(v)
@@ -561,11 +618,11 @@ The values are then normalised to "weeks" using the following factors:
                 del values["Combined follow up"]
         return values
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         v = data.get(6451782) or data.get(6451773)
         k = "Combined follow up"
         if v:
-            return self.use_rounded.get_value(k, {k: v})
+            return self.use_rounded.get_value(k, {k: v}, arm_name)
         else:
             return {k: v}
 
@@ -579,7 +636,7 @@ class CountryCleaner(AttributeCleaner):
     def linked_attributes(self):
         return (6080518,)
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         countries_values = data.get(ident, set())
         if countries_values:
             countries_values = [x for x, _ in countries_values]
@@ -614,10 +671,10 @@ Individual features are introduced for each of these classes."""
     def linked_attributes(self):
         return tuple()
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         return None
 
-    def apply_diff(self, values, diff):
+    def apply_diff(self, ident, values, diff):
         d = {
             "Pregnancy trial": None,
             "Pregnancy trial (Mixed)": None,
@@ -625,9 +682,9 @@ Individual features are introduced for each of these classes."""
         v = diff.get("Pregnancy trial 1 = yes, 2 = mix pg and non-pg")
         if v is not None:
             v = v[1]
-            if v == "1":
+            if v == 1:
                 d["Pregnancy trial"] = 1
-            elif v == "2":
+            elif v == 2:
                 d["Pregnancy trial (Mixed)"] = 1
             else:
                 raise ValueError("Unexpected value", v)
@@ -645,10 +702,10 @@ Individual features are introduced for each of these classes."""
     def linked_attributes(self):
         return tuple()
 
-    def get_value(self, ident, data):
+    def get_value(self, ident, data, arm_name):
         return None
 
-    def apply_diff(self, values, diff):
+    def apply_diff(self, idetn, values, diff):
         d = {
             "Relapse Prevention Trial": None,
             "Relapse Prevention Trial(Mixed)": None,
@@ -656,9 +713,9 @@ Individual features are introduced for each of these classes."""
         v = diff.get("Relapse prevention trial (1 = yes, 2 = mix of quitters and non-abstinent)")
         if v is not None:
             v = v[1]
-            if v == "1":
+            if v == 1:
                 d["Relapse Prevention Trial"] = 1
-            elif v == "2":
+            elif v == 2:
                 d["Relapse Prevention Trial(Mixed)"] = 1
             else:
                 raise ValueError("Unexpected value", v)
@@ -671,27 +728,29 @@ def get_id(s):
 
 
 def get_name(s):
-    return int(s.split("___")[0])
+    return s.split("___")[0]
 
 
-def clean_row(row, diff):
-    values = {
-        "bupropion": None,
-        "varenicline": None,
-        "pychologist": None,
-        "doctor": None,
-        "nurse": None,
-    }
-
+def clean_row(row, diff, arm_name):
+    #values = {
+    #    "bupropion": None,
+    #    "varenicline": None,
+    #    "pychologist": None,
+    #    "doctor": None,
+    #    "nurse": None,
+    #}
+    values = dict()
     for cleaner in _MAPPINGS:
         for attribute_id in cleaner.linked_attributes:
-            mapped = cleaner(attribute_id, row, diff)
+            mapped = cleaner(attribute_id, row, diff, arm_name)
             mapped_with_context = {k: mapped.get(k, None) for k in mapped}
             values.update(mapped_with_context)
     p1 = PregnancyTrialCleaner()
-    values.update(p1(None, row, diff))
+    values.update(p1(None, row, diff, arm_name))
     p2 = RelapsePreventionTrialCleaner()
-    values.update(p2(None, row, diff))
+    values.update(p2(None, row, diff, arm_name))
+    p3 = ControlCleaner()
+    values.update(p3(None, row, diff, arm_name))
     return values
 
 
