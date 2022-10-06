@@ -221,9 +221,9 @@ class RuleNNModel(BaseModel):
 
         self.model = best[0][1]
 
-    def predict(self, features):
+    def predict(self, features) -> np.ndarray:
         self.model.eval()
-        return self.model(features)
+        return self.model(features).detach().numpy()
 
 
     @classmethod

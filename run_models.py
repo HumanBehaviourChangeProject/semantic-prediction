@@ -1,5 +1,6 @@
 from base import cross_val, single_run
 from regression.mle import MLEModel
+from regression.random_forest import RFModel
 from rulenn.rule_nn import RuleNNModel
 from dl import DeepLearningModel
 import sys
@@ -8,13 +9,20 @@ import pickle
 
 import click
 
+model_classes = [
+    RFModel,
+    DeepLearningModel,
+    MLEModel,
+    RuleNNModel
+]
+
 @click.group()
 def cli():
     pass
 
 @cli.command()
 @click.argument('path')
-@click.option('--select', default=None)
+@click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
 def single(path, select):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
@@ -52,11 +60,7 @@ def cross(path):
             "out"
         )
 
-model_classes = [
-    DeepLearningModel,
-    MLEModel,
-    RuleNNModel
-]
+
 
 if __name__ == '__main__':
     cli()

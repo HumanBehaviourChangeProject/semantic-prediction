@@ -14,7 +14,7 @@ class BaseModel:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def predict(self, features):
+    def predict(self, features) -> np.ndarray:
         raise NotImplementedError
 
     @abc.abstractclassmethod
@@ -71,7 +71,7 @@ def single_run(model_cls, raw_features: np.ndarray, raw_labels: np.ndarray, vari
     with open(os.path.join(output_path, model_cls.name(), "predictions_test.csv",), "w") as fout:
         y_pred = model.predict(test_features)
         fout.write(",".join(("doc,arm", "prediction", "target")) + "\n")
-        for t in zip(index[test_index].values, y_pred, test_labels):
+        for t in zip(index[test_index].values, y_pred, raw_labels[test_index]):
             fout.write(",".join((str(t[0][0]), str(t[0][1]), *map(str, t[1:]))) + "\n")
         fout.flush()
 
@@ -79,7 +79,7 @@ def single_run(model_cls, raw_features: np.ndarray, raw_labels: np.ndarray, vari
     with open(os.path.join(output_path, model_cls.name(), "predictions_full.csv"), "w") as fout:
         y_pred = model.predict(all_features)
         fout.write(",".join(("set", "doc,arm", "prediction", "target")) + "\n")
-        for i, t in enumerate(zip(index, y_pred, all_labels)):
+        for i, t in enumerate(zip(index, y_pred, raw_labels)):
             fout.write(",".join(("train" if i in train_index else ("test" if i in test_index else "val"), str(t[0][0]),
                                  str(t[0][1]), *map(str, t[1:]))) + "\n")
         fout.flush()

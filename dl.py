@@ -21,21 +21,19 @@ class DeepLearningModel(BaseModel):
         epochs = 100
         net = Forward(train_features.shape[1])
         criterion = nn.MSELoss()
-        optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
+        optimizer = optim.Adam(net.parameters(), lr=1e-5)
         best = []
         keep_top = 5
         no_improvement = 0
         epoch = 0
         train_index = list(range(train_features.shape[0]))
+        running_loss = 0.0
+        j = 0
         while epoch < epochs or no_improvement < 20:  # loop over the dataset multiple times
-            running_loss = 0.0
             # get the inputs; data is a list of [inputs, labels]
-
             # zero the parameter gradients
-
-
             # forward + backward + optimize
-            j = 0
+
             batch_size = 10
             net.train()
             for i in range(0, len(train_index), batch_size):
@@ -76,7 +74,7 @@ class DeepLearningModel(BaseModel):
 
     def predict(self, features):
         self.model.eval()
-        return self.model(features)
+        return self.model(features).squeeze(-1).detach().numpy()
 
     @classmethod
     def prepare_data(cls, features, labels):
