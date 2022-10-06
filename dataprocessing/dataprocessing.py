@@ -89,9 +89,8 @@ def main():
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
 
-    keep = features.aggregate(_at_least_10, axis=0)
-
-    write_fuzzy(features.astype(float), labels.astype(float))
+    has_outcome = (~labels.isna()).values
+    write_fuzzy(features[has_outcome].astype(float), labels[has_outcome].astype(float))
 
 
 if __name__ == "__main__":

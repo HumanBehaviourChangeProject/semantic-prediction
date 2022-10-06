@@ -1,9 +1,9 @@
+import os.path
+
 import torch
 from torch import nn
 import torch.optim as optim
-from sklearn.model_selection import train_test_split
-import random
-import numpy as np
+from base import BaseModel
 import copy
 
 class Forward(nn.Module):
@@ -16,82 +16,71 @@ class Forward(nn.Module):
         return self.fwd(data)
 
 
-def cross_val(patience, features, labels, variables):
-
-    features[features.isnan()] = 0
-    results = []
-    with open("results/dl.txt", "w") as fout:
-        for _ in range(100):
-            index = list(np.array(range(features.shape[0])))
-            random.shuffle(index)
-            step = len(index) // 10
-            chunks = [index[i:i + step] for i in range(0, len(index), step)]
-            for i in range(len(chunks)):
-                train_index = [c for j in range(len(chunks)) for c in chunks[j] if i != j ]
-                val_index = chunks[i]
-                best = main(patience, features, labels, train_index, val_index, variables)
-                results.append(best)
-                for x in best[2]:
-                    fout.write(str(x.item()) + "\n")
-                fout.flush()
-
-
-def main(epochs, features, labels, train_index, val_index, variables):
-    features[features.isnan()] = 0
-
-    net = Forward(features.shape[1])
-    criterion = nn.MSELoss()
-    optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
-    best = []
-    keep_top = 5
-    no_improvement = 0
-    epoch = 0
-    while epoch < epochs or no_improvement < 20:  # loop over the dataset multiple times
-        running_loss = 0.0
-        # get the inputs; data is a list of [inputs, labels]
-
-        # zero the parameter gradients
-
-
-        # forward + backward + optimize
-        j = 0
-        batch_size = 10
-        for i in range(0, len(train_index), batch_size):
-            optimizer.zero_grad()
-            batch_index = train_index[i:i + batch_size]
-            outputs = net(features[batch_index])
-            loss = criterion(outputs, labels[batch_index])
-            running_loss += loss.item()
-            j += 1
-            loss.backward()
-            optimizer.step()
-
-        val_out = net(features[val_index])
-        val_loss = criterion(val_out, labels[val_index])
-
-
-        if not best or val_loss - best[-1][0] < -0.05:
-            best.append((val_loss, copy.deepcopy(net), (val_out - labels[val_index]).squeeze(-1)))
-            best = sorted(best, key=lambda x: x[0])
-            if not len(best) <= keep_top:
-                del best[-1]
-            no_improvement = 0
-        else:
-            no_improvement += 1
-        # print statistics
-        if epoch % 10 == 0:
-            print(f"epoch: {epoch},\tloss: {(running_loss / j)},\tval_loss: {val_loss.item()},\tno improvement since: {no_improvement}")
+class DeepLearningModel(BaseModel):
+    def train(self, train_features, train_labels, val_features, val_labels, variables):
+        epochs = 100
+        net = Forward(train_features.shape[1])
+        criterion = nn.MSELoss()
+        optimizer = optim.Adam(net.parameters(), lr=1e-4, weight_decay=1e-4)
+        best = []
+        keep_top = 5
+        no_improvement = 0
+        epoch = 0
+        train_index = list(range(train_features.shape[0]))
+        while epoch < epochs or no_improvement < 20:  # loop over the dataset multiple times
             running_loss = 0.0
+            # get the inputs; data is a list of [inputs, labels]
+
+            # zero the parameter gradients
+
+
+            # forward + backward + optimize
             j = 0
-        epoch += 1
+            batch_size = 10
+            net.train()
+            for i in range(0, len(train_index), batch_size):
+                optimizer.zero_grad()
+                batch_index = train_index[i:i + batch_size]
+                outputs = net(train_features[batch_index])
+                loss = criterion(outputs, train_labels[batch_index])
+                running_loss += loss.item()
+                j += 1
+                loss.backward()
+                optimizer.step()
 
-    print('Finished Training')
-    return best[0]
 
-if __name__ == "__main__":
-    import pickle
-    import sys
-    with open(sys.argv[2], "rb") as fin:
-        features, labels, rename = pickle.load(fin)
-    cross_val(int(sys.argv[1]), torch.tensor(features.astype(float).values).float(),
-              torch.tensor(labels.astype(float)).float(), rename)
+            net.eval()
+            val_out = net(val_features)
+            val_loss = criterion(val_out, val_labels)
+
+
+            if not best or val_loss - best[-1][0] < -0.05:
+                best.append((val_loss, copy.deepcopy(net), (val_out - val_labels).squeeze(-1)))
+                best = sorted(best, key=lambda x: x[0])
+                if not len(best) <= keep_top:
+                    del best[-1]
+                no_improvement = 0
+            else:
+                no_improvement += 1
+            # print statistics
+            if epoch % 10 == 0:
+                print(f"epoch: {epoch},\tloss: {(running_loss / j)},\tval_loss: {val_loss.item()},\tno improvement since: {no_improvement}")
+                running_loss = 0.0
+                j = 0
+            epoch += 1
+        self.model = best[0][1]
+
+    @classmethod
+    def name(cls):
+        return "dl"
+
+    def predict(self, features):
+        self.model.eval()
+        return self.model(features)
+
+    @classmethod
+    def prepare_data(cls, features, labels):
+        return torch.tensor(features.values).float(), torch.tensor(labels).float()
+
+    def save(self, path):
+        torch.save(self.model.state_dict(), os.path.join(path, "model.ckpt"))
