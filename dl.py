@@ -10,18 +10,18 @@ class Forward(nn.Module):
 
     def __init__(self, in_dim: int):
         super().__init__()
-        self.fwd = nn.Sequential(nn.Linear(in_dim, 2*in_dim), nn.LeakyReLU(), nn.Dropout(0.1), nn.Linear(2*in_dim, in_dim), nn.LeakyReLU(), nn.Dropout(0.1), nn.Linear(in_dim, in_dim//2), nn.ReLU(), nn.Linear(in_dim//2, 1))
+        self.fwd = nn.Sequential(nn.Linear(in_dim, 2*in_dim), nn.LeakyReLU(), nn.Linear(2*in_dim, in_dim), nn.LeakyReLU(), nn.Dropout(0.1), nn.Linear(in_dim, in_dim//2), nn.ReLU(), nn.Linear(in_dim//2, 1))
 
     def forward(self, data):
-        return self.fwd(data)
+        return self.fwd(data).squeeze(-1)
 
 
 class DeepLearningModel(BaseModel):
-    def train(self, train_features, train_labels, val_features, val_labels, variables):
+    def _train(self, train_features: torch.Tensor, train_labels: torch.Tensor, val_features: torch.Tensor, val_labels: torch.Tensor, variables, *args, verbose=True):
         epochs = 100
         net = Forward(train_features.shape[1])
         criterion = nn.MSELoss()
-        optimizer = optim.Adam(net.parameters(), lr=1e-5)
+        optimizer = optim.Adam(net.parameters(), lr=1e-4)
         best = []
         keep_top = 5
         no_improvement = 0
@@ -61,7 +61,7 @@ class DeepLearningModel(BaseModel):
             else:
                 no_improvement += 1
             # print statistics
-            if epoch % 10 == 0:
+            if verbose and epoch % 10 == 0:
                 print(f"epoch: {epoch},\tloss: {(running_loss / j)},\tval_loss: {val_loss.item()},\tno improvement since: {no_improvement}")
                 running_loss = 0.0
                 j = 0
@@ -70,15 +70,15 @@ class DeepLearningModel(BaseModel):
 
     @classmethod
     def name(cls):
-        return "dl"
+        return "deep"
 
-    def predict(self, features):
+    def _predict(self, features: torch.Tensor):
         self.model.eval()
         return self.model(features).squeeze(-1).detach().numpy()
 
     @classmethod
-    def prepare_data(cls, features, labels):
-        return torch.tensor(features.values).float(), torch.tensor(labels).float()
+    def _prepare_single(cls, data):
+        return torch.tensor(data).float()
 
     def save(self, path):
         torch.save(self.model.state_dict(), os.path.join(path, "model.ckpt"))

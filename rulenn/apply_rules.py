@@ -59,7 +59,7 @@ if __name__=="__main__":
         if sys.argv[i] == "-v":
             VERBOSE=True
 
-    with open("results/rules.txt", "r") as fin:
+    with open("out/rulenn/mdel.txt", "r") as fin:
         rulessets = []
         for line in fin:
             rules = []

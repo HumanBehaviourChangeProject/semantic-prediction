@@ -8,6 +8,9 @@ import numpy as np
 import pickle
 
 import click
+import warnings
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 model_classes = [
     RFModel,
@@ -45,20 +48,21 @@ def single(path, select):
 
 @cli.command()
 @click.argument('path')
-def cross(path):
+@click.option('--out', default="out")
+def cross(path, out):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
 
     features[np.isnan(features)] = 0
     variables = [x[1] for x in features.columns]
-    for model_cls in model_classes:
-        cross_val(
-            model_cls,
-            features,
-            labels[:, 0],
-            variables,
-            "out"
-        )
+
+    cross_val(
+        model_classes,
+        features,
+        labels[:, 0],
+        variables,
+        out
+    )
 
 
 
