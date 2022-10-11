@@ -47,48 +47,34 @@ class BaseModel(typing.Generic[T]):
         raise NotImplementedError
 
 
-def _run_model_on_chunk(x):
-    model_cls, train_features, train_labels, val_features, val_labels, test_features, variables, train_index, val_index = x
-    model = model_cls()
-    model.train(train_features, train_labels, val_features, val_labels, variables, train_index, val_index, verbose=False
-    )
-    y_pred = model.predict(test_features)
-    return model_cls, y_pred
-
-
 def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str):
-    for model_cls in model_classes:
-        outfile = os.path.join(output_path, model_cls.name(), "crossval.txt")
-        if os.path.isfile(outfile):
-            answer = ""
-            while answer.lower() not in ("y","n"):
-                answer = input(f"Deleting existing result file ({outfile}). OK? (Y/n)")
-            if answer.lower() == "y":
-                os.remove(outfile)
-            else:
-                print("Abort!")
-                exit()
-        os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
 
-    repeats = 1
-    counter = 0
-    for _ in range(repeats):
-        chunks = get_cross_split(raw_features.index, 5)
-        for i in range(len(chunks)-1):
-            counter += 1
-            train_index = [
-                c for j in range(len(chunks)) for c in chunks[j] if i != j and i != j - 1
-            ]
-            print(f"chunk {counter}/{repeats*(len(chunks)-1)}")
-            val_index = chunks[i]
-            test_index = chunks[i + 1]
-            for model_cls, y_pred in map(_run_model_on_chunk, [(model_cls, raw_features.iloc[train_index].values, raw_labels[train_index],
-                    raw_features.iloc[val_index].values, raw_labels[val_index], raw_features.iloc[test_index].values,
-                    variables, raw_features.iloc[train_index].index, raw_features.iloc[val_index].index) for model_cls in model_classes]):
-                with open(os.path.join(output_path, model_cls.name(), "crossval.txt"), "a") as fout:
-                    for pred, targ in zip(y_pred, raw_labels[test_index]):
-                        fout.write(str(pred - targ) + "\n")
-                    print(f"MAE {model_cls.name()}\t{np.average(np.abs(pred-targ))}")
+    outs = {c: np.empty(0) for c in model_classes}
+
+    chunks = get_cross_split(raw_features.index, 5)
+    for i in range(len(chunks)):
+        print(i)
+        train_index = [
+            c for j in range(len(chunks)) for c in chunks[j] if i != j and i != j - 1
+        ]
+        val_index = chunks[i]
+        test_index = chunks[(i + 1) % len(chunks)]
+
+        for model_cls in model_classes:
+            model = model_cls()
+            model.train(raw_features.iloc[train_index].values, raw_labels[train_index],
+                        raw_features.iloc[val_index].values, raw_labels[val_index], variables,
+                        raw_features.iloc[train_index].index, raw_features.iloc[val_index].index,
+                        verbose=False
+                        )
+            y_pred = model.predict(raw_features.iloc[test_index].values)
+            outs[model_cls] = np.concatenate((outs[model_cls], y_pred - raw_labels[test_index]))
+
+    for model_cls, values in outs.items():
+        os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
+        outfile = os.path.join(output_path, model_cls.name(), "crossval.txt")
+        with open(outfile, "w") as fout:
+            fout.write("\n".join(map(str, values)))
 
 
 def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str, seed=None):
