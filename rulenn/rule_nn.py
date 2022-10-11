@@ -77,7 +77,7 @@ class RuleNet(nn.Module):
 
     def calculate_penalties(self):
         w = self.non_lin(self.conjunctions)
-        non_crips_penalty = torch.sum(
+        non_crips_penalty = 10 * torch.sum(
             torch.sum(w * (1 - w), dim=-1), dim=0
         )  # penalty for non-crisp rules
         m = torch.max(
@@ -94,7 +94,7 @@ class RuleNet(nn.Module):
             torch.sum(self.calculate_pure_fit(w, self.disjoint_filter + self.implication_filter), dim=-1), dim=-1
         )
 
-        penalties = 0.1*(
+        penalties = 0.002*(
                 non_crips_penalty
                 + long_rules_penalty
                 + contradiction_penalty
@@ -107,25 +107,33 @@ class RuleNet(nn.Module):
         z = torch.zeros(len(names), requires_grad=False, device=device)
         for (lh, rhs) in fc.features_disjoint.items():
             lhi = self.get_index(lh, names)
-            for rh in rhs:
-                rhi = self.get_index(rh, names)
-                filters.append((lhi, rhi))
-                filters.append((lhi, len(names) + rhi))
+            if lhi is not None:
+                for rh in rhs:
+                    rhi = self.get_index(rh, names)
+                    if rhi is not None:
+                        filters.append((lhi, rhi))
+                        filters.append((lhi, len(names) + rhi))
         return filters
 
     @staticmethod
     def get_index(v, names):
-        return names.index(v)
+        try:
+            return names.index(v)
+        except ValueError:
+            print("Column not found:", v)
+            return None
 
     def load_implication_filters(self, names, device=None):
         filters = []
         z = torch.zeros(len(names), requires_grad=False, device=device)
         for (lh, rhs) in fc.features_implied.items():
             lhi = self.get_index(lh, names)
-            for rh in rhs:
-                rhi = self.get_index(rh, names)
-                filters.append((lhi, rhi))
-                filters.append((lhi, len(names) + rhi))
+            if lhi is not None:
+                for rh in rhs:
+                    rhi = self.get_index(rh, names)
+                    if rhi is not None:
+                        filters.append((lhi, rhi))
+                        filters.append((lhi, len(names) + rhi))
         return filters
 
     def calculate_pure_fit(self, w, fltr):
@@ -145,8 +153,8 @@ class RuleNNModel(BaseModel):
         )
         num_features = train_features.shape[1]
         presence_filter = torch.abs(pre) < 50
-        conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True)) + 10*torch.rand(num_features,num_features)-5)[presence_filter]
-        conjs = torch.cat((conjs, 10*torch.rand(conjs.shape)-5), dim=-1)
+        conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True)) + torch.rand(num_features,num_features))[presence_filter]
+        conjs = torch.cat((conjs, torch.rand(conjs.shape)), dim=-1)
         net = RuleNet(num_features, 200-conjs.shape[0], variables,append=(conjs, pre[presence_filter]))
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
@@ -167,7 +175,7 @@ class RuleNNModel(BaseModel):
             # get the inputs; data is a list of [inputs, labels]
             # forward + backward + optimize
 
-            e = sigmoid(10*min((epoch-50) / 100, 1)-8) if epoch > 50 else 0
+            e = sigmoid(20* min(epoch/max_epoch,1) - 10)
             batch_size = 10
             random.shuffle((train_index))
             net.train()
@@ -184,6 +192,7 @@ class RuleNNModel(BaseModel):
                 loss = base_loss + penalties
                 loss.backward()
                 optimizer.step()
+
                 # print(net.conjunctions.grad)
                 running_loss += base_loss.detach().item()
                 running_penalties += penalties.detach().item()
@@ -213,7 +222,7 @@ class RuleNNModel(BaseModel):
             if verbose and epoch % 10 == 0:
                 best_val_loss = best[0][0] if best else -1
                 print(
-                    f"{{epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\t best_val_loss: {best_val_loss:0.2f},\tval_rmse: {val_loss.item()**0.5:.2f},\tval_mae: {val_rmse.item():.2f},\te: {e}}}"
+                    f"{{epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\t best_val_loss: {best_val_loss:0.2f},\tval_rmse: {val_loss.item()**0.5:.2f},\tval_mae: {val_rmse.item():.2f},\te: {e:.2f}}}"
                 )
                 running_loss = 0.0
                 running_penalties = 0.0

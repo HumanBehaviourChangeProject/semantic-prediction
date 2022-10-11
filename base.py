@@ -2,11 +2,13 @@ import csv
 import os
 
 import pandas as pd
+import tqdm
 from sklearn.model_selection import train_test_split
 import numpy as np
 import typing
 import abc
 import random
+from dataprocessing.filters import feature_filter
 import multiprocessing as mp
 
 T = typing.TypeVar("T")
@@ -47,12 +49,17 @@ class BaseModel(typing.Generic[T]):
         raise NotImplementedError
 
 
+def filter_features(features):
+    headers = [i for i in features.columns if i[0] in feature_filter]
+    return features[headers]
+
+
 def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str):
 
     outs = {c: np.empty(0) for c in model_classes}
 
     chunks = get_cross_split(raw_features.index, 5)
-    for i in range(len(chunks)):
+    for i in tqdm.tqdm(list(range(len(chunks)))):
         train_index = [
             c for j in range(len(chunks)) for c in chunks[j] if i != j and i != j - 1
         ]
@@ -105,6 +112,7 @@ def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, va
 
     model.save(os.path.join(output_path, model_cls.name()))
 
+
 def get_data_split(index, seed=None):
     documents = list({i[0] for i in index})
     random.shuffle(documents)
@@ -124,9 +132,3 @@ def get_cross_split(index, num_splits=3):
     random.shuffle(documents)
     splits = np.array_split(documents, num_splits)
     return [[i for i, t in enumerate(index) if t[0] in split] for split in splits]
-
-
-def get_feature_set(included_values):
-    with open("data/feature_filter.csv", "rt") as fin:
-        reader = csv.reader(fin)
-        return {i: (v in included_values) for i, _, v, _ in reader if v in included_values}
