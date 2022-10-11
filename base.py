@@ -53,7 +53,6 @@ def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, v
 
     chunks = get_cross_split(raw_features.index, 5)
     for i in range(len(chunks)):
-        print(i)
         train_index = [
             c for j in range(len(chunks)) for c in chunks[j] if i != j and i != j - 1
         ]
