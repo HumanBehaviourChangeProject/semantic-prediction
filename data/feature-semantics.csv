@@ -1,0 +1,154 @@
+﻿featurename,group
+1.1.Goal setting (behavior),intervention
+1.2 Problem solving,intervention
+1.3 Goal setting (outcome),intervention
+1.4 Action planning,intervention
+1.5 Review behavior goal(s),intervention
+1.6 Discrepancy between current behavior and goal,intervention
+1.7 Review outcome goal(s),intervention
+1.8 Behavioral contract,intervention
+1.9 Commitment,intervention
+10.1 Material incentive (behavior),intervention
+10.10 Reward (outcome),intervention
+10.11 Future punishment,intervention
+10.2 Material reward (behavior),intervention
+10.3 Non-specific reward,intervention
+10.4 Social reward,intervention
+10.5 Social incentive,intervention
+10.6 Non-specific incentive,intervention
+10.8 Incentive (outcome),intervention
+10.9 Self-reward,intervention
+11.1 Pharmacological support,intervention
+11.2 Reduce negative emotions,intervention
+12.1 Restructuring the physical environment,intervention
+12.2 Restructuring the social environment,intervention
+12.3 Avoidance/reducing exposure to cues for the behavior,intervention
+12.4 Distraction,intervention
+12.5 Adding objects to the environment,intervention
+12.6 Body changes,intervention
+13.1 Identification of self as role model,intervention
+13.2 Framing/reframing,intervention
+13.3 Incompatible beliefs,intervention
+13.4 Valued self-identify,intervention
+13.5 Identity associated with changed behavior,intervention
+14.1 Behavior cost,intervention
+14.2 Punishment,intervention
+14.3 Remove reward,intervention
+14.4 Reward approximation,intervention
+14.8 Reward alternative behavior,intervention
+14.9 Reduce reward frequency,intervention
+15.1 Verbal persuasion about capability,intervention
+15.2 Mental rehearsal of successful performance,intervention
+15.3 Focus on past success,intervention
+15.4 Self-talk,intervention
+16.1 Imaginary punishment,intervention
+16.2 Imaginary reward,intervention
+2.1 Monitoring of behavior by others without feedback,intervention
+2.2 Feedback on behaviour,intervention
+2.3 Self-monitoring of behavior,intervention
+2.4 Self-monitoring of outcome(s) of behaviour,intervention
+2.5 Monitoring of outcome(s) of behavior without feedback,intervention
+2.6 Biofeedback,intervention
+2.7 Feedback on outcome(s) of behavior,intervention
+3.1 Social support (unspecified),intervention
+3.2 Social support (practical),intervention
+3.3 Social support (emotional),intervention
+4.1 Instruction on how to perform the behavior,intervention
+4.2 Information about Antecedents,intervention
+4.3 Re-attribution,intervention
+4.5. Advise to change behavior,intervention
+5.1 Information about health consequences,intervention
+5.2 Salience of consequences,intervention
+5.3 Information about social and environmental consequences,intervention
+5.4 Monitoring of emotional consequences,intervention
+6.1 Demonstration of behavior,intervention
+6.2 Social comparison,intervention
+6.3 Information about others' approval,intervention
+7.1 Prompts/cues,intervention
+7.3 Reduce prompts/cues,intervention
+7.4 Remove access to the reward,intervention
+7.5 Remove aversive stimulus,intervention
+7.6 Satiation,intervention
+7.7 Exposure,intervention
+7.8 Associative learning,intervention
+8.1 Behavioral practice/rehearsal,intervention
+8.2 Behavior substitution,intervention
+8.4 Habit reversal,intervention
+8.7 Graded tasks,intervention
+9.1 Credible source,intervention
+9.2 Pros and cons,intervention
+9.3 Comparative imagining of future outcomes,intervention
+Abstinence: Continuous ,outcome
+Abstinence: Point Prevalence ,outcome
+Biochemical verification,verification
+CBT,intervention
+Combined follow up (<= 1 month),followup
+Combined follow up (<= 8 months),followup
+Combined follow up (<= 15 month),followup
+Combined follow up (<= 20 months),followup
+Combined follow up (<= 28 months),followup
+Combined follow up (Reported),followup
+Digital content type,deliverymode
+Face to face,deliverymode
+Group-based,deliverymode
+Health Professional,deliverysource
+Individual-level analysed (<= 300),individual
+Individual-level analysed (<= 800),individual
+Individual-level analysed (<= 2500),individual
+Individual-level analysed (<= 10000),individual
+Individual-level analysed (<= 30000),individual
+Mean age (child),meanage
+Mean age (adolecent),meanage
+Mean age (young adult),meanage
+Mean age (adult),meanage
+Mean age (elderly),meanage
+Mean number of times tobacco used (<= 5),meantobacco
+Mean number of times tobacco used (<= 10),meantobacco
+Mean number of times tobacco used (<= 15),meantobacco
+Mean number of times tobacco used (<= 20),meantobacco
+Mean number of times tobacco used (<= 25),meantobacco
+Mean number of times tobacco used (Reported),meantobacco
+Motivational Interviewing,intervention
+Patch,pharmacological
+Pharmaceutical company competing interest,study
+Pharmaceutical company funding,study
+Pill,pharmacological
+Pregnancy trial,study
+Pregnancy trial (Mixed),study
+Printed material,deliverymode
+Proportion identifying as female gender (None),proportionfemale
+Proportion identifying as female gender (<= 15),proportionfemale
+Proportion identifying as female gender (<= 35),proportionfemale
+Proportion identifying as female gender (<= 45),proportionfemale
+Proportion identifying as female gender (<= 60),proportionfemale
+Proportion identifying as female gender (<= 99),proportionfemale
+Proportion identifying as female gender (All),proportionfemale
+Proportion identifying as male gender (None),proportionmale
+Proportion identifying as male gender (<= 15),proportionmale
+Proportion identifying as male gender (<= 35),proportionmale
+Proportion identifying as male gender (<= 45),proportionmale
+Proportion identifying as male gender (<= 60),proportionmale
+Proportion identifying as male gender (<= 99),proportionmale
+Proportion identifying as male gender (All),proportionmale
+Relapse Prevention Trial,study
+Relapse Prevention Trial(Mixed),study
+Somatic,deliverymode
+Website / Computer Program / App,deliverymode
+aggregate patient role,patientrole
+brief advise,intervention
+bupropion,pharmacological
+control,study
+doctor,deliverysource
+e_cigarette,pharmacological
+gum,pharmacological
+healthcare facility,setting
+inhaler,pharmacological
+lozenge,pharmacological
+nasal_spray,pharmacological
+nrt,pharmacological
+nurse,deliverysource
+phone,deliverymode
+placebo,pharmacological
+psychologist,deliverysource
+text messaging,deliverymode
+varenicline,pharmacological

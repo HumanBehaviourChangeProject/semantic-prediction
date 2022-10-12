@@ -24,23 +24,106 @@ sys.path.append(str(SCRIPT_DIR))
 from rule_nn import RuleNet
 from base import filter_features
 
-
 with open('data/hbcp_gen.pkl', "rb") as fin:
     features, labels = pickle.load(fin)
-    #features = filter_features(features)
+    features = filter_features(features)
 
 index = np.array(features.index)
 featurenames = [x[1] for x in features.columns]
 
+featuresemantics = pd.read_csv('data/feature-semantics.csv')
+
+intervention = featuresemantics.query('group == "intervention"')['featurename'].values.tolist()
+intervention = [x for x in intervention if x in featurenames]
+delivery = featuresemantics.query('group == "deliverymode"')['featurename'].values.tolist()
+delivery = [x for x in delivery if x in featurenames]
+source = featuresemantics.query('group == "deliverysource"')['featurename'].values.tolist()
+source = [x for x in source if x in featurenames]
+pharmacological = featuresemantics.query('group == "pharmacological"')['featurename'].values.tolist()
+pharmacological = [x for x in pharmacological if x in featurenames]
+outcome = featuresemantics.query('group == "outcome"')['featurename'].values.tolist()
+outcome = [x for x in outcome if x in featurenames]
+
 app_ui = ui.page_fluid(
-    ui.h2("Hello Shiny!"),
-    ui.input_slider("n", "N", 0, 100, 20),
-    ui.output_text_verbatim("txt"),
-    ui.output_text_verbatim("txtfeatures")
+    ui.panel_title(ui.h2("HBCP predictions (prototype): Smoking Cessation")),
+
+    ui.layout_sidebar(ui.panel_sidebar(
+        ui.input_checkbox_group('intervention',
+                                'Intervention',
+                                intervention),
+        ui.input_checkbox_group("delivery",
+                                "Delivery",
+                                delivery
+                                ),
+        ui.input_checkbox_group("source",
+                                "Source",
+                                source
+                                ),
+        ui.panel_conditional("input.intervention.indexOf('11.1 Pharmacological support') > -1",
+                             ui.input_radio_buttons("pharmacological",
+                                                    "Pharmacological",
+                                                    pharmacological,
+                                                    selected="placebo"
+                                                    )
+                             ),
+    ),
+        ui.panel_main(ui.row(
+                             ui.column(4,
+                                       ui.input_slider("meanage",
+                                                       "Mean age",
+                                                       15, # min (mean age)
+                                                       80, # max (mean age)
+                                                       25  # mean (age)
+                                                       ),
+                                       ui.input_slider("proportionfemale",
+                                                       "Proportion female",
+                                                       0,
+                                                       100,
+                                                       50  # mean (proportion female)
+                                                       )
+                                       ),
+                             ui.column(4,
+                                       ui.input_slider("meantobacco",
+                                                       "Mean number of times tobacco used",
+                                                       1, # min (mean number of times tobacco used)
+                                                       30,
+                                                       10 # median(df.clean$Mean.number.of.times.tobacco.used)
+                                                       ),
+                                       ui.input_checkbox("patientrole",
+                                                         "Patient role?"
+                                                        )
+                                       ),
+                             ui.column(4,
+                                       ui.input_radio_buttons(
+                                           "outcome",
+                                           "Outcome",
+                                           choices=outcome
+                                       ),
+                                       ui.input_checkbox(
+                                           "verification",
+                                           "Biochemical verification"
+                                       ),
+                                       ui.input_slider(
+                                           "followup",
+                                           "Follow up (weeks)",
+                                           4, #min(df.clean$Combined.follow.up),
+                                           60,   #as.integer(max(df.clean$Combined.follow.up)),
+                                           12     #median(df.clean$Combined.follow.up)
+                                       ),
+                                       )
+                      )
+        )
+    ),
+
 )
 
 
 def server(input, output, session):
+
+    def preparePrediction():
+        return ''
+
+
     @output
     @render.text
     def txt():
