@@ -22,13 +22,15 @@ sys.path.append(str(PACKAGE_PARENT2))
 sys.path.append(str(SCRIPT_DIR))
 
 from rule_nn import RuleNet
+from base import filter_features
 
 
 with open('data/hbcp_gen.pkl', "rb") as fin:
     features, labels = pickle.load(fin)
+    #features = filter_features(features)
 
 index = np.array(features.index)
-rename = [x[1] for x in features.columns]
+featurenames = [x[1] for x in features.columns]
 
 app_ui = ui.page_fluid(
     ui.h2("Hello Shiny!"),
@@ -47,7 +49,7 @@ def server(input, output, session):
     @output
     @render.text
     def txtfeatures():
-        return str(rename)
+        return str(featurenames)
 
 
 app = App(app_ui, server)
