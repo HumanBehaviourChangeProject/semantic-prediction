@@ -1,8 +1,9 @@
 pandas
 xlsxwriter
 scikit-fuzzy
-seaborn
 thefuzz
 torch
 scikit-learn
 torchmetrics
+statsmodels
+click

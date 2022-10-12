@@ -1,83 +1,109 @@
 import csv
 import os
 
+import pandas as pd
+import tqdm
 from sklearn.model_selection import train_test_split
 import numpy as np
 import typing
 import abc
 import random
+from dataprocessing.filters import feature_filter
+import multiprocessing as mp
 
+T = typing.TypeVar("T")
 
-class BaseModel:
-    @abc.abstractmethod
-    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, variables:typing.List[typing.AnyStr]):
+class BaseModel(typing.Generic[T]):
+    def _train(self, train_features: T, train_labels: T, val_features: T, val_labels: T, variables:typing.List[typing.AnyStr], train_docs, val_docs, verbose=True):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def predict(self, features) -> np.ndarray:
+    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, variables:typing.List[typing.AnyStr], train_docs, val_docs, verbose=True):
+        return self._train(
+            self._prepare_single(train_features),
+            self._prepare_single(train_labels),
+            self._prepare_single(val_features),
+            self._prepare_single(val_labels),
+            variables, train_docs, val_docs, verbose=verbose
+        )
+
+    @abc.abstractmethod
+    def predict(self, features: np.ndarray) -> np.ndarray:
+        return self._predict(
+            self._prepare_single(features)
+        )
+
+    @abc.abstractmethod
+    def _predict(self, features: np.ndarray) -> np.ndarray:
         raise NotImplementedError
 
     @abc.abstractclassmethod
     def name(cls):
         raise NotImplementedError
 
-    @classmethod
-    def prepare_data(cls, features, labels):
-        return features, labels
+    def _prepare_single(self, data: np.ndarray) -> T:
+        return data
 
     @abc.abstractmethod
     def save(self, path):
         raise NotImplementedError
 
 
-def cross_val(model_cls, raw_features: np.ndarray, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str):
-    os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
-    with open(os.path.join(output_path, model_cls.name(), "crossval.txt"), "w") as fout:
-        for _ in range(10):
-            chunks = get_cross_split(raw_features.index, 5)
-            for i in range(len(chunks) - 1):
-                train_index = [
-                    c for j in range(len(chunks)) for c in chunks[j] if i != j and i != j - 1
-                ]
-                val_index = chunks[i]
-                test_index = chunks[i + 1]
-                model = model_cls()
-                model.train(
-                    *model_cls.prepare_data(raw_features.iloc[train_index],  raw_labels[train_index]),
-                    *model_cls.prepare_data(raw_features.iloc[val_index],  raw_labels[val_index]),
-                    variables
-                )
-                test_features, test_labels = model_cls.prepare_data(raw_features.iloc[test_index], raw_labels[test_index])
-                y_pred = model.predict(test_features)
-
-                for pred, targ in zip(y_pred.tolist(), test_labels.squeeze(-1).tolist()):
-                    fout.write(str(pred - targ) + "\n")
+def filter_features(features):
+    headers = [i for i in features.columns if i[0] in feature_filter]
+    return features[headers]
 
 
-def single_run(model_cls, raw_features: np.ndarray, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str, seed=None):
+def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str):
+
+    outs = {c: np.empty(0) for c in model_classes}
+
+    chunks = get_cross_split(raw_features.index, 5)
+    for i in tqdm.tqdm(list(range(len(chunks)))):
+        train_index = [
+            c for j in range(len(chunks)) for c in chunks[j] if i != j and i != j - 1
+        ]
+        val_index = chunks[i]
+        test_index = chunks[(i + 1) % len(chunks)]
+
+        for model_cls in model_classes:
+            model = model_cls()
+            model.train(raw_features.iloc[train_index].values, raw_labels[train_index],
+                        raw_features.iloc[val_index].values, raw_labels[val_index], variables,
+                        raw_features.iloc[train_index].index, raw_features.iloc[val_index].index,
+                        verbose=False
+                        )
+            y_pred = model.predict(raw_features.iloc[test_index].values)
+            outs[model_cls] = np.concatenate((outs[model_cls], y_pred - raw_labels[test_index]))
+
+    for model_cls, values in outs.items():
+        os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
+        outfile = os.path.join(output_path, model_cls.name(), "crossval.txt")
+        with open(outfile, "w") as fout:
+            fout.write("\n".join(map(str, values)))
+
+
+def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str, seed=None):
     os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
     index = raw_features.index
     train_index, test_index, val_index = get_data_split(raw_features.index)
     model = model_cls()
 
     model.train(
-        *model_cls.prepare_data(raw_features.iloc[train_index], raw_labels[train_index]),
-        *model_cls.prepare_data(raw_features.iloc[val_index], raw_labels[val_index]),
-        variables
+        raw_features.iloc[train_index].values, raw_labels[train_index],
+        raw_features.iloc[val_index].values, raw_labels[val_index],
+        variables, raw_features.iloc[train_index].index, raw_features.iloc[val_index].index
     )
 
-    test_features, test_labels = model_cls.prepare_data(raw_features.iloc[test_index], raw_labels[test_index])
-
     with open(os.path.join(output_path, model_cls.name(), "predictions_test.csv",), "w") as fout:
-        y_pred = model.predict(test_features)
+        y_pred = model.predict(raw_features.iloc[test_index].values)
         fout.write(",".join(("doc,arm", "prediction", "target")) + "\n")
         for t in zip(index[test_index].values, y_pred, raw_labels[test_index]):
             fout.write(",".join((str(t[0][0]), str(t[0][1]), *map(str, t[1:]))) + "\n")
         fout.flush()
 
-    all_features, all_labels = model_cls.prepare_data(raw_features, raw_labels)
     with open(os.path.join(output_path, model_cls.name(), "predictions_full.csv"), "w") as fout:
-        y_pred = model.predict(all_features)
+        y_pred = model.predict(raw_features.values)
         fout.write(",".join(("set", "doc,arm", "prediction", "target")) + "\n")
         for i, t in enumerate(zip(index, y_pred, raw_labels)):
             fout.write(",".join(("train" if i in train_index else ("test" if i in test_index else "val"), str(t[0][0]),
@@ -85,6 +111,7 @@ def single_run(model_cls, raw_features: np.ndarray, raw_labels: np.ndarray, vari
         fout.flush()
 
     model.save(os.path.join(output_path, model_cls.name()))
+
 
 def get_data_split(index, seed=None):
     documents = list({i[0] for i in index})
@@ -103,17 +130,5 @@ def get_data_split(index, seed=None):
 def get_cross_split(index, num_splits=3):
     documents = list({i[0] for i in index})
     random.shuffle(documents)
-    p = 1/num_splits
-    splits = []
-    remainder = documents
-    for i in range(num_splits):
-        split, remainder = train_test_split(remainder, train_size=p)
-        splits.append(split)
-
+    splits = np.array_split(documents, num_splits)
     return [[i for i, t in enumerate(index) if t[0] in split] for split in splits]
-
-
-def get_feature_set(included_values):
-    with open("data/feature_filter.csv", "rt") as fin:
-        reader = csv.reader(fin)
-        return {i: (v in included_values) for i, _, v, _ in reader if v in included_values}

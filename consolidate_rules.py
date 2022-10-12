@@ -16,7 +16,7 @@ with open("out/rulenn/frequents.txt", "w") as fout:
     transactions = [{i for i, v in enumerate(con) if v} for rule in rulessets for con, _ in rule]
     initial_item_sets = [frozenset({x}) for x in items]
 
-    tres = 100
+    tres = 1
     current = [i for i,l in ((i, len([t for t in transactions if i.issubset(t)] )) for i in initial_item_sets) if l > tres]
     while current:
         nxt = [(i,l) for i,l in ((i, len([t for t in transactions if i.issubset(t)])) for i in current) if l > tres]
