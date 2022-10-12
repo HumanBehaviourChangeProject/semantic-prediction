@@ -2,13 +2,13 @@
 feature_filter = [
     6452745, # 1.1.Goal setting (behavior)
     6452746, # 1.2 Problem solving
-    6452747, # 1.3 Goal setting (outcome)
+    #6452747, # 1.3 Goal setting (outcome)
     6452748, # 1.4 Action planning
-    6452749, # 1.5 Review behavior goal(s)
-    6452750, # 1.6 Discrepancy between current behavior and goal
-    6452751, # 1.7 Review outcome goal(s)
-    6452752, # 1.8 Behavioral contract
-    6452753, # 1.9 Commitment
+    #6452749, # 1.5 Review behavior goal(s)
+    #6452750, # 1.6 Discrepancy between current behavior and goal
+    #6452751, # 1.7 Review outcome goal(s)
+    #6452752, # 1.8 Behavioral contract
+    #6452753, # 1.9 Commitment
     #6452936, # 10.1 Material incentive (behavior)
     #6452945, # 10.10 Reward (outcome)
     #6452946, # 10.11 Future punishment
@@ -92,7 +92,7 @@ feature_filter = [
     6080691, # Digital content type
     6080686, # Face to face
     6080701, # Group-based
-    #6080704, # Health Professional
+    6080704, # Health Professional
     "Individual-level analysed (<= 300)", # Individual-level analysed (<= 300)
     "Individual-level analysed (<= 800)", # Individual-level analysed (<= 800)
     "Individual-level analysed (<= 2500)", # Individual-level analysed (<= 2500)
