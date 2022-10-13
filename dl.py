@@ -17,7 +17,7 @@ class Forward(nn.Module):
 
 
 class DeepLearningModel(BaseModel):
-    def _train(self, train_features: torch.Tensor, train_labels: torch.Tensor, val_features: torch.Tensor, val_labels: torch.Tensor, variables, *args, verbose=True):
+    def _train(self, train_features: torch.Tensor, train_labels: torch.Tensor, val_features: torch.Tensor, val_labels: torch.Tensor, *args, verbose=True):
         epochs = 100
         net = Forward(train_features.shape[1])
         criterion = nn.MSELoss()

@@ -13,8 +13,8 @@ class RFModel(BaseModel):
     def name(cls):
         return "random_forest"
 
-    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray,
-              val_labels: np.ndarray, variables: typing.List[typing.AnyStr], *args, verbose=True):
+    def _train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray,
+              val_labels: np.ndarray, *args, verbose=True):
         self.model = RandomForestRegressor(100, max_depth=4, max_leaf_nodes=7)
         self.model.fit(X=train_features, y=train_labels)
         pred = self.model.predict(X=val_features)
