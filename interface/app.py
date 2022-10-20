@@ -1,36 +1,53 @@
+import inspect
+import pathlib
+import pickle
+import sys
+
+import numpy as np
+import pandas as pd
 from shiny import App, render, ui
 
-import pickle
-import pandas as pd
-import numpy as np
-import torch
-
-import sys
-import pathlib
-import inspect
-import statistics
-import math
-
-import itertools
+### Handle local imports
 
 src_file_path = inspect.getfile(lambda: None)
 
 PACKAGE_PARENT = pathlib.Path(src_file_path).parent
 PACKAGE_PARENT2 = PACKAGE_PARENT.parent
-SCRIPT_DIR = PACKAGE_PARENT2 / "rulenn"
+#SCRIPT_DIR = PACKAGE_PARENT2 / "rulenn"
+#DATAPR_DIR = PACKAGE_PARENT2 / "dataprocessing"
 sys.path.append(str(PACKAGE_PARENT2))
-sys.path.append(str(SCRIPT_DIR))
+#sys.path.append(str(SCRIPT_DIR))
+#sys.path.append(str(DATAPR_DIR))
 
-from rule_nn import RuleNet
 from base import filter_features
-from apply_rules import print_applied_rules, get_feature_row_str
+from rulenn.apply_rules import print_applied_rules
+from rulenn.rule_nn import RuleNNModel
+from dataprocessing.fuzzysets import FUZZY_SETS
 
-with open('data/hbcp_gen.pkl', "rb") as fin:
-    features, labels = pickle.load(fin)
-    features = filter_features(features)
+###  Server state
 
-index = np.array(features.index)
+checkpoint = 'out/rulenn/model_example.json'
+path = 'data/hbcp_gen.pkl'
+filters = True
+
+model = RuleNNModel.load(checkpoint)
+with open(path, "rb") as fin:
+    raw_features, raw_labels = pickle.load(fin)
+raw_features[np.isnan(raw_features)] = 0
+
+if filters:
+    features = filter_features(raw_features)
+else:
+    features = raw_features
+
 featurenames = [x[1] for x in features.columns]
+
+#for row in model._prepare_single(features.values):
+#    fits = model.model.calculate_fit(row.unsqueeze(0))
+#    print("The following rules were applied:")
+#    print_applied_rules(model.model.non_lin(model.model.conjunctions), model.model.rule_weights, fits, features.columns)
+#    print(f"The application of these rules resulted in the following prediction: {model.model.apply_fit(fits).item()}")
+#    print("\n---\n")
 
 featuresemantics = pd.read_csv('data/feature-semantics.csv')
 
@@ -112,7 +129,8 @@ app_ui = ui.page_fluid(
                                            12     #median(df.clean$Combined.follow.up)
                                        ),
                                        )
-                      )
+                      ),
+            ui.row( ui.column(12,ui.output_text("predict") ) )
         )
     ),
 
@@ -120,9 +138,40 @@ app_ui = ui.page_fluid(
 
 
 def server(input, output, session):
-
-    def preparePrediction():
-        return ''
+    @output
+    @render.text
+    def predict():
+        test = features.iloc[0].values
+        # Baseline
+        test[0: len(test)] = 0
+        fuzzynames = ['Mean age',
+                      'Proportion identifying as female gender',
+                      'Proportion identifying as male gender',
+                      'Mean number of times tobacco used',
+                      'Combined follow up']
+        fuzzyvalues = [input.meanage(),
+                       input.proportionfemale(),
+                       100-input.proportionfemale(),
+                       input.meantobacco(),
+                       input.followup()]
+        for fname, fvalue in zip(fuzzynames, fuzzyvalues):
+            fs = FUZZY_SETS.get(fname)
+            for valname, valfs in list(fs.items()):
+                colname = f"{fname} ({valname})"
+                test[featurenames.index(colname)] = valfs(fvalue)
+        test[featurenames.index('aggregate patient role')] = input.patientrole()
+        control = [i for i in test]  # deep copy
+        control[featurenames.index('control')] = 1
+        # intervention attributes
+        
+        # run prediction
+        testv = model._prepare_single(test)
+        testf = model.model.calculate_fit(testv.unsqueeze(0))
+        testp = model.model.apply_fit(testf).item()
+        ctrlv = model._prepare_single(control)
+        ctrlf = model.model.calculate_fit(ctrlv.unsqueeze(0))
+        ctrlp = model.model.apply_fit(ctrlf).item()
+        return [test,control,testp,ctrlp]
 
 
     @output

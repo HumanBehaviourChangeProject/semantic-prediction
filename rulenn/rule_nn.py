@@ -1,9 +1,7 @@
 import random
-import sys
 
 from torch import nn
 import torch
-from torch.nn import functional as nnf
 import torch.optim as optim
 import copy
 import numpy as np
