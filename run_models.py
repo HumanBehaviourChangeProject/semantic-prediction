@@ -8,6 +8,7 @@ from base import cross_val, single_run, filter_features
 from regression.mle import MLEModel
 from regression.random_forest import RFModel
 from rulenn.rule_nn import RuleNNModel
+from rulenn.apply_rules import print_rules, print_applied_rules
 from dl import DeepLearningModel
 import numpy as np
 import pickle
@@ -104,6 +105,29 @@ def cross(path, out, filters):
 def printrules(path):
     model = RuleNNModel.load(path)
     model.print_rules()
+
+
+@cli.command()
+@click.argument('path')
+@click.argument('checkpoint')
+@click.option('--filters', is_flag=True, default=False)
+def apply(path, checkpoint, filters):
+    model = RuleNNModel.load(checkpoint)
+    with open(path, "rb") as fin:
+        raw_features, raw_labels = pickle.load(fin)
+    raw_features[np.isnan(raw_features)] = 0
+
+    if filters:
+        features = filter_features(raw_features)
+    else:
+        features = raw_features
+
+    for row in model._prepare_single(features.values):
+        fits = model.model.calculate_fit(row.unsqueeze(0))
+        print("The following rules were applied:")
+        print_applied_rules(model.model.non_lin(model.model.conjunctions), model.model.rule_weights, fits, features.columns)
+        print(f"The application of these rules resulted in the following prediction: {model.model.apply_fit(fits).item()}")
+        print("\n---\n")
 
 
 @cli.command()
