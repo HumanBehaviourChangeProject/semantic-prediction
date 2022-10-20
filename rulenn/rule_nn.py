@@ -147,7 +147,7 @@ def sigmoid(x):
 
 class RuleNNModel(BaseModel):
 
-    def _train(self, train_features, train_labels, val_features, val_labels, variables, *args, verbose=True):
+    def _train(self, train_features, train_labels, val_features, val_labels, variables, *args, verbose=True, weights=None):
 
         pre = torch.tensor(
             np.linalg.lstsq(train_features.cpu().numpy(), train_labels.cpu(), rcond=None)[0],
@@ -187,7 +187,11 @@ class RuleNNModel(BaseModel):
                 batch_labels = train_labels[batch_index].squeeze(-1)
                 outputs = net(train_features[batch_index])
 
-                base_loss = criterion(outputs, batch_labels)
+                base_loss = (outputs - batch_labels)**2
+                if weights is not None:
+                    base_loss = base_loss * weights[batch_index].squeeze(-1)
+
+                base_loss = torch.sum(base_loss, dim=-1)**0.5
 
                 #loss = base_loss + penalties
                 penalties = e * net.calculate_penalties()

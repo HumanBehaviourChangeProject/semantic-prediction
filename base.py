@@ -18,17 +18,17 @@ class BaseModel(typing.Generic[T]):
     def __init__(self, variables: typing.List[typing.AnyStr]):
         self.variables = variables
 
-    def _train(self, train_features: T, train_labels: T, val_features: T, val_labels: T, train_docs, val_docs, verbose=True):
+    def _train(self, train_features: T, train_labels: T, val_features: T, val_labels: T, train_docs, val_docs, verbose=True, weights=None):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, train_docs, val_docs, verbose=True):
+    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, train_docs, val_docs, verbose=True, weights=None):
         return self._train(
             self._prepare_single(train_features),
             self._prepare_single(train_labels),
             self._prepare_single(val_features),
             self._prepare_single(val_labels),
-            train_docs, val_docs, verbose=verbose
+            train_docs, val_docs, verbose=verbose, weights=self._prepare_single(weights) if weights is not None else None
         )
 
     @abc.abstractmethod
@@ -90,16 +90,16 @@ def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, v
             fout.write("\n".join(map(str, values)))
 
 
-def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], no_test, output_path: str, seed=None):
+def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], no_test, output_path: str, seed=None, weights=None):
     os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
     index = raw_features.index
-    train_index, test_index, val_index = get_data_split(raw_features.index, test=not no_test)
+    train_index, test_index, val_index = get_data_split(raw_features.index, test=not no_test, seed=seed)
     model = model_cls(variables)
 
     model.train(
         raw_features.iloc[train_index].values, raw_labels[train_index],
         raw_features.iloc[val_index].values, raw_labels[val_index],
-        raw_features.iloc[train_index].index, raw_features.iloc[val_index].index
+        raw_features.iloc[train_index].index, raw_features.iloc[val_index].index, weights=weights.iloc[train_index].values if weights is not None else None
     )
 
     if not no_test:
