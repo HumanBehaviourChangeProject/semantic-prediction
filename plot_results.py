@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from math import fabs
 buckets = []
 
-folder = "out_full"
+folder = "out"
 
 with open(f"{folder}/random_forest/crossval.txt", "r") as fin:
     buckets.append(("decision tree", [float(l) for l in fin]))

@@ -14,17 +14,21 @@ import multiprocessing as mp
 T = typing.TypeVar("T")
 
 class BaseModel(typing.Generic[T]):
-    def _train(self, train_features: T, train_labels: T, val_features: T, val_labels: T, variables:typing.List[typing.AnyStr], train_docs, val_docs, verbose=True):
+
+    def __init__(self, variables: typing.List[typing.AnyStr]):
+        self.variables = variables
+
+    def _train(self, train_features: T, train_labels: T, val_features: T, val_labels: T, train_docs, val_docs, verbose=True, weights=None):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, variables:typing.List[typing.AnyStr], train_docs, val_docs, verbose=True):
+    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, train_docs, val_docs, verbose=True, weights=None):
         return self._train(
             self._prepare_single(train_features),
             self._prepare_single(train_labels),
             self._prepare_single(val_features),
             self._prepare_single(val_labels),
-            variables, train_docs, val_docs, verbose=verbose
+            train_docs, val_docs, verbose=verbose, weights=self._prepare_single(weights) if weights is not None else None
         )
 
     @abc.abstractmethod
@@ -48,6 +52,9 @@ class BaseModel(typing.Generic[T]):
     def save(self, path):
         raise NotImplementedError
 
+    @abc.abstractclassmethod
+    def load(self, path):
+        raise NotImplementedError
 
 def filter_features(features):
     headers = [i for i in features.columns if i[0] in feature_filter]
@@ -67,9 +74,9 @@ def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, v
         test_index = chunks[(i + 1) % len(chunks)]
 
         for model_cls in model_classes:
-            model = model_cls()
+            model = model_cls(variables)
             model.train(raw_features.iloc[train_index].values, raw_labels[train_index],
-                        raw_features.iloc[val_index].values, raw_labels[val_index], variables,
+                        raw_features.iloc[val_index].values, raw_labels[val_index],
                         raw_features.iloc[train_index].index, raw_features.iloc[val_index].index,
                         verbose=False
                         )
@@ -83,45 +90,53 @@ def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, v
             fout.write("\n".join(map(str, values)))
 
 
-def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str, seed=None):
+def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], no_test, output_path: str, seed=None, weights=None):
     os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
     index = raw_features.index
-    train_index, test_index, val_index = get_data_split(raw_features.index)
-    model = model_cls()
+    train_index, test_index, val_index = get_data_split(raw_features.index, test=not no_test, seed=seed)
+    model = model_cls(variables)
 
     model.train(
         raw_features.iloc[train_index].values, raw_labels[train_index],
         raw_features.iloc[val_index].values, raw_labels[val_index],
-        variables, raw_features.iloc[train_index].index, raw_features.iloc[val_index].index
+        raw_features.iloc[train_index].index, raw_features.iloc[val_index].index, weights=weights.iloc[train_index].values if weights is not None else None
     )
 
-    with open(os.path.join(output_path, model_cls.name(), "predictions_test.csv",), "w") as fout:
-        y_pred = model.predict(raw_features.iloc[test_index].values)
-        fout.write(",".join(("doc,arm", "prediction", "target")) + "\n")
-        for t in zip(index[test_index].values, y_pred, raw_labels[test_index]):
-            fout.write(",".join((str(t[0][0]), str(t[0][1]), *map(str, t[1:]))) + "\n")
-        fout.flush()
+    if not no_test:
+        with open(os.path.join(output_path, model_cls.name(), "predictions_test.csv",), "w") as fout:
+            y_pred = model.predict(raw_features.iloc[test_index].values)
+            fout.write(",".join(("doc,arm", "prediction", "target")) + "\n")
+            for t in zip(index[test_index].values, y_pred, raw_labels[test_index]):
+                fout.write(",".join((str(t[0][0]), str(t[0][1]), *map(str, t[1:]))) + "\n")
+            fout.flush()
 
     with open(os.path.join(output_path, model_cls.name(), "predictions_full.csv"), "w") as fout:
         y_pred = model.predict(raw_features.values)
         fout.write(",".join(("set", "doc,arm", "prediction", "target")) + "\n")
         for i, t in enumerate(zip(index, y_pred, raw_labels)):
-            fout.write(",".join(("train" if i in train_index else ("test" if i in test_index else "val"), str(t[0][0]),
+            fout.write(",".join(("train" if i in train_index else ("test" if test_index and i in test_index else "val"), str(t[0][0]),
                                  str(t[0][1]), *map(str, t[1:]))) + "\n")
         fout.flush()
 
     model.save(os.path.join(output_path, model_cls.name()))
 
 
-def get_data_split(index, seed=None):
+def get_data_split(index, seed=None, test=False):
     documents = list({i[0] for i in index})
     random.shuffle(documents)
+    if test:
+        split = 0.8
+    else:
+        split = 0.9
 
-    train_doc_index, val_doc_index = train_test_split(list(documents), random_state=seed, train_size=0.8)
-    test_doc_index, val_doc_index = train_test_split(val_doc_index, random_state=seed, train_size=0.5)
+    train_doc_index, val_doc_index = train_test_split(list(documents), random_state=seed, train_size=split)
+    if test:
+        test_doc_index, val_doc_index = train_test_split(val_doc_index, random_state=seed, train_size=0.5)
+        test_index = [i for i, t in enumerate(index) if t[0] in test_doc_index]
+    else:
+        test_index = None
 
     train_index = [i for i, t in enumerate(index) if t[0] in train_doc_index]
-    test_index = [i for i, t in enumerate(index) if t[0] in test_doc_index]
     val_index = [i for i, t in enumerate(index) if t[0] in val_doc_index]
 
     return train_index, test_index, val_index

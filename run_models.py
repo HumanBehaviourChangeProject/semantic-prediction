@@ -1,9 +1,15 @@
+import csv
+import random
+
+import pandas as pd
+import tqdm
+
 from base import cross_val, single_run, filter_features
 from regression.mle import MLEModel
 from regression.random_forest import RFModel
 from rulenn.rule_nn import RuleNNModel
+from rulenn.apply_rules import print_rules, print_applied_rules
 from dl import DeepLearningModel
-import sys
 import numpy as np
 import pickle
 
@@ -23,11 +29,17 @@ model_classes = [
 def cli():
     pass
 
+
 @cli.command()
 @click.argument('path')
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
 @click.option('--filters', is_flag=True, default=False)
-def single(path, select, filters):
+@click.option('--no-test', is_flag=True, default=False)
+@click.option('--weighted', is_flag=True, default=False)
+def single(*args, **kwargs):
+    _single(*args, **kwargs)
+
+def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
 
@@ -37,6 +49,17 @@ def single(path, select, filters):
         models_to_run = model_classes
 
     features[np.isnan(features)] = 0
+
+    weights = None
+    if weighted:
+        with open("data/analysed.csv") as fin:
+            reader = csv.reader(fin)
+            weights = {(int(a), int(b), c, d): {0: float(v) if v != "" else 1} for a, b, c, d, v in reader}
+            weights = [(k, v) for k, v in weights.items() if k in features.index]
+            keys, values = zip(*weights)
+            weights = pd.DataFrame(values, index=keys)
+            weights = weights.astype(float)
+
 
     if filters is not None:
         features = filter_features(features)
@@ -48,8 +71,12 @@ def single(path, select, filters):
             features,
             labels[:, 0],
             variables,
-            "out"
+            no_test,
+            "out",
+            weights=weights,
+            seed=seed
         )
+
 
 @cli.command()
 @click.argument('path')
@@ -73,7 +100,48 @@ def cross(path, out, filters):
         out
     )
 
+@cli.command()
+@click.argument('path')
+def printrules(path):
+    model = RuleNNModel.load(path)
+    model.print_rules()
 
+
+@cli.command()
+@click.argument('path')
+@click.argument('checkpoint')
+@click.option('--filters', is_flag=True, default=False)
+def apply(path, checkpoint, filters):
+    model = RuleNNModel.load(checkpoint)
+    with open(path, "rb") as fin:
+        raw_features, raw_labels = pickle.load(fin)
+    raw_features[np.isnan(raw_features)] = 0
+
+    if filters:
+        features = filter_features(raw_features)
+    else:
+        features = raw_features
+
+    for row in model._prepare_single(features.values):
+        fits = model.model.calculate_fit(row.unsqueeze(0))
+        print("The following rules were applied:")
+        print_applied_rules(model.model.non_lin(model.model.conjunctions), model.model.rule_weights, fits, features.columns)
+        print(f"The application of these rules resulted in the following prediction: {model.model.apply_fit(fits).item()}")
+        print("\n---\n")
+
+
+@cli.command()
+@click.argument('n')
+@click.argument('path')
+@click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
+@click.option('--filters', is_flag=True, default=False)
+@click.option('--no-test', is_flag=True, default=False)
+@click.option('--weighted', is_flag=True, default=False)
+def runcopy(n, *args, **kwargs):
+    import shutil
+    for i in tqdm.tqdm(list(range(int(n)))):
+        _single(*args, seed=random.randint(1,1000), **kwargs)
+        shutil.copyfile("out/rulenn/model.json", f"out/rulenn/model.{i+69}.json")
 
 if __name__ == '__main__':
     cli()

@@ -86,10 +86,14 @@ def main():
     features[female][features[female].isnull()] = 100 - features[male][features[female].isnull()]
     features[male][features[male].isnull()] = 100 - features[female][features[male].isnull()]
 
+    with open("data/analysed.csv", "wb") as fout:
+        features[(6080719, "Individual-level analysed")].to_csv(fout)
+
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
 
     has_outcome = (~labels.isna()).values
+
     write_fuzzy(features[has_outcome].astype(float), labels[has_outcome].astype(float))
 
 
