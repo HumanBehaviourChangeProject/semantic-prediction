@@ -23,6 +23,7 @@ sys.path.append(str(SCRIPT_DIR))
 
 from rule_nn import RuleNet
 from base import filter_features
+from apply_rules import print_applied_rules, get_feature_row_str
 
 with open('data/hbcp_gen.pkl', "rb") as fin:
     features, labels = pickle.load(fin)
