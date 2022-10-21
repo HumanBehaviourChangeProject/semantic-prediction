@@ -12,7 +12,7 @@ from rulenn.apply_rules import print_rules, print_applied_rules
 from dl import DeepLearningModel
 import numpy as np
 import pickle
-
+import math
 import click
 import warnings
 
@@ -39,6 +39,7 @@ def cli():
 def single(*args, **kwargs):
     _single(*args, **kwargs)
 
+
 def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
@@ -52,13 +53,17 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
 
     weights = None
     if weighted:
+        copy_features = pd.DataFrame()
         with open("data/analysed.csv") as fin:
             reader = csv.reader(fin)
-            weights = {(int(a), int(b), c, d): {0: float(v) if v != "" else 1} for a, b, c, d, v in reader}
+            weights = {(int(a), int(b), c, d): (max(1, int(math.log2(float(v)))) if v != "" else 1) for a, b, c, d, v in reader}
             weights = [(k, v) for k, v in weights.items() if k in features.index]
-            keys, values = zip(*weights)
-            weights = pd.DataFrame(values, index=keys)
-            weights = weights.astype(float)
+            #keys, values = zip(*weights)
+            #weights = pd.DataFrame(values, index=keys)
+            #weights = weights.astype(float)
+            features = pd.DataFrame(y for x in [[features.loc[key]]*value for key, value in weights] for y in x)
+            labels = np.array([y for x in [[labels[i]] * value for i, (key, value) in enumerate(weights)] for y in x])
+            print(copy_features)
 
 
     if filters is not None:
@@ -73,7 +78,7 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
             variables,
             no_test,
             "out",
-            weights=weights,
+            #weights=weights,
             seed=seed
         )
 

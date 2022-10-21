@@ -59,15 +59,14 @@ class RuleNet(nn.Module):
     def calculate_fit(self, x0):
         mu = self.non_lin(self.conjunctions)
         x = torch.cat((x0, 1 - x0), dim=1)
-        x_exp = self.dropout(x.unsqueeze(1).expand((-1, self.conjunctions.shape[0], -1)))
-        x_pot = (mu * x_exp) + (1 - mu)  # torch.pow(x_exp, mu)
+        x_pot = mu * (x[:,None,:] - 1) + 1  # torch.pow(x_exp, mu)
         return self.tnorm(x_pot, dim=-1)
 
     def forward(self, x0):
         return self.apply_fit(self.calculate_fit(x0))
 
     def apply_fit(self, fit):
-        return self.base + torch.sum(self.rule_weights * fit, dim=-1).squeeze(-1)
+        return 10 + torch.sum(self.rule_weights * fit, dim=-1).squeeze(-1)
 
     def print_rules(self, variables):
         weights = self.non_lin(self.conjunctions)
@@ -141,6 +140,7 @@ class RuleNet(nn.Module):
     def calculate_pure_fit(self, w, fltr):
         return self.tnorm(torch.stack([w[f] for f in fltr]), dim=-1)
 
+
 def sigmoid(x):
   return 1 / (1 + math.exp(-x))
 
@@ -178,7 +178,7 @@ class RuleNNModel(BaseModel):
             # forward + backward + optimize
 
             e = min(epoch/(max_epoch/2),1)
-            batch_size = 10
+            batch_size = 100
             random.shuffle((train_index))
             net.train()
             for i in list(range(0, len(train_index), batch_size)):
