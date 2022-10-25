@@ -130,7 +130,7 @@ def apply(path, checkpoint, filters, v, threshold):
         features = raw_features
 
     for row in features.values:
-        applied_rules, result = apply_rules(model, [row], features.columns)
+        applied_rules, result = apply_rules(model, row, features.columns)
         print("The following rules were applied:")
         for conjunction, impact, fit in applied_rules:
             if impact > 0:
