@@ -21,11 +21,11 @@ def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold
         features: names of the features
         feature_threshold: weight threshold above which the fit of a feature is considered part of a rule
 
-    Returns: (conjunction_list, fit)
-        conjunction_list: A list of tuples (lhs, impact, con_fit) where each element represents the application of
+    Returns: (rule_applications, fit)
+        rule_applications: A list of tuples (lhs, impact, con_fit) where each element represents the application of
             a rule to `x`. `lhs` is a list of tuples (f, w) of those features whole weight w was above the
-            `feature_threshold` in this rule. `fit` is the degree to which this rule fits the feature vector `x` and
-            `con_fit` represents the product of this rule's fit with it's rule weight.
+            `feature_threshold` in this rule. `con_fit` is the degree to which this rule fits the feature vector `x` and
+            `impact` represents the product of `con_fit` with this rule's weight.
         fit: The overal prediction of the system
 
     """
