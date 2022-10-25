@@ -13,7 +13,19 @@ def print_rules(df: pd.DataFrame):
         print(" & ".join(df.columns[:-1][row[1][:-1]>0.3]) + " => " + str(row[1][-1]))
 
 
-def apply_rules(container:RuleNNModel, x:np.ndarray, features, fit_threshold=0.1, feature_threshold=0.1):
+def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold=0.1):
+    """
+    Args:
+        container: A trained instance of RuleNNModel
+        x: A 1d-array of features
+        features: names of the features
+        feature_threshold: weight threshold above which the fit of a feature is considered part of a rule
+
+    Returns: (conjunction_list, fit)
+        conjunction_list: A list of those features whole weight was above the `feature_weight`
+        fit: The overal prediction of the system
+
+    """
     rules = []
     conjunctions = container.model.non_lin(container.model.conjunctions)
     fits = container.model.calculate_fit(container._prepare_single(x))
