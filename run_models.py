@@ -8,7 +8,7 @@ from base import cross_val, single_run, filter_features
 from regression.mle import MLEModel
 from regression.random_forest import RFModel
 from rulenn.rule_nn import RuleNNModel
-from rulenn.apply_rules import print_rules, print_applied_rules
+from rulenn.apply_rules import print_rules, apply_rules
 from dl import DeepLearningModel
 import numpy as np
 import pickle
@@ -116,7 +116,9 @@ def printrules(path):
 @click.argument('path')
 @click.argument('checkpoint')
 @click.option('--filters', is_flag=True, default=False)
-def apply(path, checkpoint, filters):
+@click.option('-v', default=False, count=True)
+@click.option('--threshold', type=float, default = 0.1)
+def apply(path, checkpoint, filters, v, threshold):
     model = RuleNNModel.load(checkpoint)
     with open(path, "rb") as fin:
         raw_features, raw_labels = pickle.load(fin)
@@ -127,11 +129,19 @@ def apply(path, checkpoint, filters):
     else:
         features = raw_features
 
-    for row in model._prepare_single(features.values):
-        fits = model.model.calculate_fit(row.unsqueeze(0))
+    for row in features.values:
+        applied_rules, result = apply_rules(model, [row], features.columns)
         print("The following rules were applied:")
-        print_applied_rules(model.model.non_lin(model.model.conjunctions), model.model.rule_weights, fits, features.columns)
-        print(f"The application of these rules resulted in the following prediction: {model.model.apply_fit(fits).item()}")
+        for conjunction, impact, fit in applied_rules:
+            if impact > 0:
+                impstr = f"raise predicted outcome by {impact:.2f}"
+            else:
+                impstr = f"lower predicted outcome by {-impact:.2f}"
+            if v>0:
+                impstr += f" (fit: {fit.item():.2f})"
+            if fit > threshold:
+                print(" & ".join(name + ("" if v <= 0 else f"[{weight:.2f}]") for name, weight in conjunction) + " => " + impstr)
+        print(f"The application of these rules resulted in the following prediction: {result:.2f}")
         print("\n---\n")
 
 
