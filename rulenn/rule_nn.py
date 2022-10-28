@@ -147,6 +147,13 @@ def sigmoid(x):
 
 class RuleNNModel(BaseModel):
 
+    def __init__(self, *args, **kwargs):
+        super(RuleNNModel, self).__init__(*args, **kwargs)
+        if torch.cuda.is_available():
+            self.device = "cuda:0"
+        else:
+            self.device = "cpu"
+
     def _train(self, train_features, train_labels, val_features, val_labels, variables, *args, verbose=True, weights=None):
 
         pre = torch.tensor(
@@ -158,6 +165,7 @@ class RuleNNModel(BaseModel):
         conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True)) + -10*torch.rand(num_features,num_features))[presence_filter]
         conjs = torch.cat((conjs, -10*torch.rand(conjs.shape)), dim=-1)
         net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]))
+        net.to(self.device)
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
         optimizer = optim.Adam(net.parameters(), lr=1e-2)
@@ -245,7 +253,7 @@ class RuleNNModel(BaseModel):
 
     @classmethod
     def _prepare_single(cls, data):
-        return torch.tensor(data).float()
+        return torch.tensor(data).float().to()
 
 
     @classmethod
