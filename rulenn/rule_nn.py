@@ -44,7 +44,7 @@ class RuleNet(nn.Module):
         self.implication_filter = self.load_implication_filters()
         self.disjoint_filter = self.load_disjoint_filters()
 
-        d = torch.diag(torch.ones((len(names),), requires_grad=False), device=device)
+        d = torch.diag(torch.ones((len(names),), requires_grad=False, device=device))
         z = torch.zeros(len(names), len(names), requires_grad=False, device=device)
         self.pos = torch.cat([d, z])
         self.neg = torch.cat([z, d])
