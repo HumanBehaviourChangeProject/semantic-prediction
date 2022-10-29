@@ -61,7 +61,7 @@ def filter_features(features):
     return features[headers]
 
 
-def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str):
+def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str, no_test):
 
     outs = {c: np.empty(0) for c in model_classes}
 

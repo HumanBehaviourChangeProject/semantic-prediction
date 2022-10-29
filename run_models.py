@@ -51,7 +51,6 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
 
     features[np.isnan(features)] = 0
 
-    weights = None
     if weighted:
         copy_features = pd.DataFrame()
         with open("data/analysed.csv") as fin:
@@ -87,23 +86,59 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
 @click.argument('path')
 @click.option('--out', default="out")
 @click.option('--filters', is_flag=True, default=False)
-def cross(path, out, filters):
+@click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
+@click.option('--no-test', is_flag=True, default=False)
+@click.option('--weighted', is_flag=True, default=False)
+def cross(*args, **kwargs):
+    _cross(*args, **kwargs)
+
+
+def _cross(path, out, filters, select, no_test, weighted, **kwargs):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
+
+    if select is not None:
+        models_to_run = [m for m in model_classes if m.name() == select]
+    else:
+        models_to_run = model_classes
 
     features[np.isnan(features)] = 0
 
     if filters is not None:
         features = filter_features(features)
 
+    if weighted:
+        copy_features = pd.DataFrame()
+        with open("data/analysed.csv") as fin:
+            reader = csv.reader(fin)
+            weights = {(int(a), int(b), c, d): (max(1, int(math.log2(float(v)))) if v != "" else 1) for a, b, c, d, v in reader}
+            weights = [(k, v) for k, v in weights.items() if k in features.index]
+
+            features = pd.DataFrame(y for x in [[features.loc[key]]*value for key, value in weights] for y in x)
+            labels = np.array([y for x in [[labels[i]] * value for i, (key, value) in enumerate(weights)] for y in x])
+            print(copy_features)
+
     variables = [x[1] for x in features.columns]
     cross_val(
-        model_classes,
+        models_to_run,
         features,
         labels[:, 0],
         variables,
-        out
+        out,
+        no_test
     )
+
+@cli.command()
+@click.argument('path')
+@click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
+def cross_full(path, select):
+    out = "out"
+    for filters in (True, False):
+        for weighted in (True, False):
+            out += "_" + ("filtered" if filters else "unfiltered")
+            out += "_" + ("weighted" if weighted else "unweighted")
+            _cross(path=path,out=out,filters=filters,select=select,no_test=False,weighted=weighted)
+
 
 @cli.command()
 @click.argument('path')
