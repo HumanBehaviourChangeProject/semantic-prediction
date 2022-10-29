@@ -16,16 +16,16 @@ import json
 
 class RuleNet(nn.Module):
     def __init__(
-        self, num_variables, num_conjunctions, names, config=None, append=None
+        self, num_variables, num_conjunctions, names, config=None, append=None, device="cpu"
     ):
         super().__init__()
         self.variables = names
         if config is None:
             conj = - 18 * torch.rand(
-                (num_conjunctions, 2 * num_variables), requires_grad=True
+                (num_conjunctions, 2 * num_variables), requires_grad=True, device=device
             )
-            rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True)
-            base = 13 + 6 * torch.rand(1, requires_grad=True)
+            rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True, device=device)
+            base = 13 + 6 * torch.rand(1, requires_grad=True, device=device)
             if append is not None:
                 conj = torch.cat((conj, append[0]))
                 rw = torch.cat((rw, append[1]))
@@ -44,8 +44,8 @@ class RuleNet(nn.Module):
         self.implication_filter = self.load_implication_filters()
         self.disjoint_filter = self.load_disjoint_filters()
 
-        d = torch.diag(torch.ones((len(names),), requires_grad=False))
-        z = torch.zeros(len(names), len(names), requires_grad=False)
+        d = torch.diag(torch.ones((len(names),), requires_grad=False), device=device)
+        z = torch.zeros(len(names), len(names), requires_grad=False, device=device)
         self.pos = torch.cat([d, z])
         self.neg = torch.cat([z, d])
 
@@ -164,8 +164,7 @@ class RuleNNModel(BaseModel):
         presence_filter = torch.abs(pre) < 50
         conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True)) + -10*torch.rand(num_features,num_features))[presence_filter]
         conjs = torch.cat((conjs, -10*torch.rand(conjs.shape)), dim=-1)
-        net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]))
-        net.to(self.device)
+        net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
         optimizer = optim.Adam(net.parameters(), lr=1e-2)
