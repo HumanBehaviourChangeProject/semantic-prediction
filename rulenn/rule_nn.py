@@ -252,7 +252,11 @@ class RuleNNModel(BaseModel):
 
     @classmethod
     def _prepare_single(cls, data):
-        return torch.tensor(data).float().to()
+        if torch.cuda.is_available():
+            device = "cuda:0"
+        else:
+            device = "cpu"
+        return torch.tensor(data, device=device).float()
 
 
     @classmethod
