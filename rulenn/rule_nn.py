@@ -248,7 +248,7 @@ class RuleNNModel(BaseModel):
 
     def _predict(self, features) -> np.ndarray:
         self.model.eval()
-        return self.model(features).detach().numpy()
+        return self.model(features).detach().cpu().numpy()
 
 
     @classmethod
