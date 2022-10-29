@@ -85,7 +85,7 @@ class RuleNet(nn.Module):
             torch.sum(w * (1 - w), dim=-1), dim=0
         )  # penalty for non-crisp rules
         m = torch.mean(
-            torch.stack((torch.sum(w, dim=-1) - 3, torch.zeros(w.shape[:-1]))),
+            torch.stack((torch.sum(w, dim=-1) - 3, torch.zeros(w.shape[:-1], device=self.device))),
             dim=0,
         )
         long_rules_penalty = 10*torch.norm(m) # penalty for long rules
