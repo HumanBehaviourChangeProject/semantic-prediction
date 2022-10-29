@@ -158,7 +158,7 @@ class RuleNNModel(BaseModel):
 
         pre = torch.tensor(
             np.linalg.lstsq(train_features.cpu().numpy(), train_labels.cpu(), rcond=None)[0],
-            requires_grad=True,
+            requires_grad=True, device=self.device
         )
         num_features = train_features.shape[1]
         presence_filter = torch.abs(pre) < 50
