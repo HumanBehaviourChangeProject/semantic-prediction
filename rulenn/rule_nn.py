@@ -19,6 +19,7 @@ class RuleNet(nn.Module):
         self, num_variables, num_conjunctions, names, config=None, append=None, device="cpu"
     ):
         super().__init__()
+        self.device = device
         self.variables = names
         if config is None:
             conj = - 18 * torch.rand(
