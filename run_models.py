@@ -132,9 +132,9 @@ def _cross(path, out, filters, select, no_test, weighted, **kwargs):
 @click.argument('path')
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
 def cross_full(path, select):
-    out = "out"
     for filters in (True, False):
         for weighted in (True, False):
+            out = "out"
             out += "_" + ("filtered" if filters else "unfiltered")
             out += "_" + ("weighted" if weighted else "unweighted")
             _cross(path=path,out=out,filters=filters,select=select,no_test=False,weighted=weighted)

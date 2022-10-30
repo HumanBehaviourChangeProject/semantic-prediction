@@ -274,9 +274,9 @@ class RuleNNModel(BaseModel):
             json.dump(
                 dict(
                     variables=self.variables,
-                    conjunctions=self.model.conjunctions.detach().numpy().tolist(),
-                    weights=self.model.rule_weights.detach().numpy().tolist(),
-                    base=self.model.base.detach().numpy().tolist()
+                    conjunctions=self.model.conjunctions.detach().cpu().numpy().tolist(),
+                    weights=self.model.rule_weights.detach().cpu().numpy().tolist(),
+                    base=self.model.base.detach().cpu().numpy().tolist()
                 ), fout
             )
 
