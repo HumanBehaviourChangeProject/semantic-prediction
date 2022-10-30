@@ -1,6 +1,7 @@
 import random
 import sys
 
+import tqdm
 from torch import nn
 import torch
 from torch.nn import functional as nnf
@@ -168,10 +169,9 @@ class RuleNNModel(BaseModel):
         net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
-        optimizer = optim.Adam(net.parameters(), lr=1e-2)
+        optimizer = optim.Adam(net.parameters(), lr=5e-3)
         keep_top = 5
         no_improvement = 0
-        epoch = 0
         best = []
         j = 0
         running_loss = 0.0
@@ -179,8 +179,8 @@ class RuleNNModel(BaseModel):
         max_epoch = 400
 
         train_index = list(range(train_features.shape[0]))
-
-        while epoch < max_epoch or no_improvement < max_epoch*0.2:
+        progress = tqdm.tqdm(list(range(max_epoch)))
+        for epoch in progress:
             # loop over the dataset multiple times
             # get the inputs; data is a list of [inputs, labels]
             # forward + backward + optimize
@@ -234,15 +234,21 @@ class RuleNNModel(BaseModel):
                 else:
                     no_improvement += 1
             # print statistics
-            if verbose and epoch % 10 == 0:
+            if verbose:
                 best_val_loss = best[0][0] if best else -1
-                print(
-                    f"{{epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\t best_val_loss: {best_val_loss:0.2f},\tval_rmse: {val_loss.item()**0.5:.2f},\tval_mae: {val_rmse.item():.2f},\te: {e:.2f}}}"
+                progress.set_postfix_str(
+                    f"\tloss: {(running_loss / j):.2f},"
+                    f"\tpenalties: {(running_penalties / j):.2f},"
+                    f"\tval_loss: {val_loss.item():.2f},"
+                    f"\t best_val_loss: {best_val_loss:0.2f},"
+                    f"\tval_rmse: {val_loss.item()**0.5:.2f},"
+                    f"\tval_mae: {val_rmse.item():.2f},"
+                    f"\te: {e:.2f}}}",
+                    refresh=False
                 )
                 running_loss = 0.0
                 running_penalties = 0.0
                 j = 0
-            epoch += 1
 
         self.model = best[0][1]
 
