@@ -163,7 +163,7 @@ def server(input, output, session):
         control = [i for i in test]  # deep copy
         control[featurenames.index('control')] = 1
         # intervention attributes
-        
+
         # run prediction
         testv = model._prepare_single(test)
         testf = model.model.calculate_fit(testv.unsqueeze(0))
