@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 from shiny import App, render, ui
 
+import matplotlib.pyplot as plt
+
 ### Handle local imports
 
 src_file_path = inspect.getfile(lambda: None)
@@ -20,13 +22,13 @@ sys.path.append(str(PACKAGE_PARENT2))
 #sys.path.append(str(DATAPR_DIR))
 
 from base import filter_features
-from rulenn.apply_rules import print_applied_rules
 from rulenn.rule_nn import RuleNNModel
+from rulenn.apply_rules import apply_rules
 from dataprocessing.fuzzysets import FUZZY_SETS
 
 ###  Server state
 
-checkpoint = 'out/rulenn/model_example.json'
+checkpoint = 'out/rulenn/examples/model_example.json'
 path = 'data/hbcp_gen.pkl'
 filters = True
 
@@ -41,14 +43,6 @@ else:
     features = raw_features
 
 featurenames = [x[1] for x in features.columns]
-
-#for row in model._prepare_single(features.values):
-#    fits = model.model.calculate_fit(row.unsqueeze(0))
-#    print("The following rules were applied:")
-#    print_applied_rules(model.model.non_lin(model.model.conjunctions), model.model.rule_weights, fits, features.columns)
-#    print(f"The application of these rules resulted in the following prediction: {model.model.apply_fit(fits).item()}")
-#    print("\n---\n")
-
 featuresemantics = pd.read_csv('data/feature-semantics.csv')
 
 intervention = featuresemantics.query('group == "intervention"')['featurename'].values.tolist()
@@ -130,7 +124,7 @@ app_ui = ui.page_fluid(
                                        ),
                                        )
                       ),
-            ui.row( ui.column(12,ui.output_text("predict") ) )
+            ui.row( ui.column(12,ui.output_plot("predict") ) )
         )
     ),
 
@@ -139,7 +133,7 @@ app_ui = ui.page_fluid(
 
 def server(input, output, session):
     @output
-    @render.text
+    @render.plot
     def predict():
         test = features.iloc[0].values
         # Baseline
@@ -165,24 +159,32 @@ def server(input, output, session):
         # intervention attributes
 
         # run prediction
-        testv = model._prepare_single(test)
-        testf = model.model.calculate_fit(testv.unsqueeze(0))
-        testp = model.model.apply_fit(testf).item()
-        ctrlv = model._prepare_single(control)
-        ctrlf = model.model.calculate_fit(ctrlv.unsqueeze(0))
-        ctrlp = model.model.apply_fit(ctrlf).item()
-        return [test,control,testp,ctrlp]
+        (testrls,testfit) = apply_rules(model,test,featurenames)
+        (ctrlrls,ctrlfit) = apply_rules(model,control,featurenames)
+
+        for a in testrls:
+            print("LHS:",a[0],"\nIMPACT:",a[1],"\nCONFIT",a[2])
+        #return [testfit,ctrlfit,testrls]
+        testimpacts = [a[1] for a in testrls]
+        ctrlimpacts = [b[1] for b in ctrlrls]
+        testnames = [a[0] for a  in testrls]
+        ctrlnames = [b[0] for b in testrls]
+
+        f = plt.figure(figsize=(12,20))
+        axarr = f.add_subplot(1, 2, 1)
+        plt.barh(list(range(0,-len(testimpacts),-1)),testimpacts,color=['red' if a < 0 else 'green' for a in testimpacts])
+        plt.title('Test ('+str(testfit)+')')
+        plt.xlabel('Rule impact (% cessation)')
+        plt.yticks([])
+
+        axarr = f.add_subplot(1, 2, 2)
+        plt.barh(list(range(0,-len(ctrlimpacts),-1)),ctrlimpacts,color=['red' if a < 0 else 'green' for a in ctrlimpacts])
+        plt.title('Control (' + str(ctrlfit) + ')')
+        plt.xlabel('Rule impact (% cessation)')
+        plt.yticks([])
+
+        return f
 
 
-    @output
-    @render.text
-    def txt():
-        return f"n*2 is {input.n() * 2}"
-
-    @output
-    @render.text
-    def txtfeatures():
-        return str(featurenames)
-
-
+# Start the application
 app = App(app_ui, server)
