@@ -3,32 +3,40 @@ import pickle
 import os
 import numpy as np
 import pandas as pd
-import tqdm
+from rulenn.rule_nn import RuleNNModel
 
 VERBOSE = False
+
 
 def print_rules(df: pd.DataFrame):
     for row in df.iterrows():
         print(" & ".join(df.columns[:-1][row[1][:-1]>0.3]) + " => " + str(row[1][-1]))
 
 
-def print_applied_rules(conjunctions, rule_weights, fits, features, fit_threshold=0.1, feature_threshold=0.1):
-    rules = []
-    for row, weight, fit in zip(conjunctions, rule_weights, fits[0]):
-        conjunction = [f"{features[i][1]}"+ (f"[{row[i]}]" if VERBOSE else "") for i in range(len(features)-1) if row[i] > feature_threshold]
-        impact = fit.item()*weight.item()
-        rules.append((conjunction, impact, fit))
-    rules = sorted(rules, key=lambda x:-abs(x[1]))
-    for conjunction, impact, fit in rules:
-        if impact > 0:
-            impstr = f"raise predicted outcome by {impact}"
-        else:
-            impstr = f"lower predicted outcome by {-impact}"
+def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold=0.1):
+    """
+    Args:
+        container: A trained instance of RuleNNModel
+        x: A 1d-array of features
+        features: names of the features
+        feature_threshold: weight threshold above which the fit of a feature is considered part of a rule
 
-        if VERBOSE:
-            impstr += f" (fit: {fit.item()})"
-        if fit > fit_threshold:
-            print(" & ".join(conjunction) + " => " + impstr)
+    Returns: (rule_applications, fit)
+        rule_applications: A list of tuples (lhs, impact, con_fit) where each element represents the application of
+            a rule to `x`. `lhs` is a list of tuples (f, w) of those features whole weight w was above the
+            `feature_threshold` in this rule. `con_fit` is the degree to which this rule fits the feature vector `x` and
+            `impact` represents the product of `con_fit` with this rule's weight.
+        fit: The overal prediction of the system
+
+    """
+    rules = []
+    conjunctions = container.model.non_lin(container.model.conjunctions)
+    fits = container.model.calculate_fit(container._prepare_single([x]))
+    for row, weight, fit in zip(conjunctions, container.model.rule_weights, fits[0]):
+        conjunctions = [(features[i][1], row[i].item()) for i in range(len(features)-1) if row[i] > feature_threshold]
+        impact = fit.item()*weight.item()
+        rules.append((conjunctions, impact, fit))
+    return sorted(rules, key=lambda x:-abs(x[1])), container.model.apply_fit(fits).item()
 
 
 def get_feature_row_str(row, names,threshold=0.1):

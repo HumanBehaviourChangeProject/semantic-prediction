@@ -14,16 +14,17 @@ import json
 
 class RuleNet(nn.Module):
     def __init__(
-        self, num_variables, num_conjunctions, names, config=None, append=None
+        self, num_variables, num_conjunctions, names, config=None, append=None, device="cpu"
     ):
         super().__init__()
+        self.device = device
         self.variables = names
         if config is None:
             conj = - 18 * torch.rand(
-                (num_conjunctions, 2 * num_variables), requires_grad=True
+                (num_conjunctions, 2 * num_variables), requires_grad=True, device=device
             )
-            rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True)
-            base = 13 + 6 * torch.rand(1, requires_grad=True)
+            rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True, device=device)
+            base = 13 + 6 * torch.rand(1, requires_grad=True, device=device)
             if append is not None:
                 conj = torch.cat((conj, append[0]))
                 rw = torch.cat((rw, append[1]))
@@ -42,8 +43,8 @@ class RuleNet(nn.Module):
         self.implication_filter = self.load_implication_filters()
         self.disjoint_filter = self.load_disjoint_filters()
 
-        d = torch.diag(torch.ones((len(names),), requires_grad=False))
-        z = torch.zeros(len(names), len(names), requires_grad=False)
+        d = torch.diag(torch.ones((len(names),), requires_grad=False, device=device))
+        z = torch.zeros(len(names), len(names), requires_grad=False, device=device)
         self.pos = torch.cat([d, z])
         self.neg = torch.cat([z, d])
 
@@ -57,15 +58,14 @@ class RuleNet(nn.Module):
     def calculate_fit(self, x0):
         mu = self.non_lin(self.conjunctions)
         x = torch.cat((x0, 1 - x0), dim=1)
-        x_exp = self.dropout(x.unsqueeze(1).expand((-1, self.conjunctions.shape[0], -1)))
-        x_pot = (mu * x_exp) + (1 - mu)  # torch.pow(x_exp, mu)
+        x_pot = mu * (x[:,None,:] - 1) + 1  # torch.pow(x_exp, mu)
         return self.tnorm(x_pot, dim=-1)
 
     def forward(self, x0):
         return self.apply_fit(self.calculate_fit(x0))
 
     def apply_fit(self, fit):
-        return self.base + torch.sum(self.rule_weights * fit, dim=-1).squeeze(-1)
+        return 10 + torch.sum(self.rule_weights * fit, dim=-1).squeeze(-1)
 
     def print_rules(self, variables):
         weights = self.non_lin(self.conjunctions)
@@ -84,7 +84,7 @@ class RuleNet(nn.Module):
             torch.sum(w * (1 - w), dim=-1), dim=0
         )  # penalty for non-crisp rules
         m = torch.mean(
-            torch.stack((torch.sum(w, dim=-1) - 3, torch.zeros(w.shape[:-1]))),
+            torch.stack((torch.sum(w, dim=-1) - 3, torch.zeros(w.shape[:-1], device=self.device))),
             dim=0,
         )
         long_rules_penalty = 10*torch.norm(m) # penalty for long rules
@@ -139,23 +139,31 @@ class RuleNet(nn.Module):
     def calculate_pure_fit(self, w, fltr):
         return self.tnorm(torch.stack([w[f] for f in fltr]), dim=-1)
 
+
 def sigmoid(x):
   return 1 / (1 + math.exp(-x))
 
 
 class RuleNNModel(BaseModel):
 
+    def __init__(self, *args, **kwargs):
+        super(RuleNNModel, self).__init__(*args, **kwargs)
+        if torch.cuda.is_available():
+            self.device = "cuda:0"
+        else:
+            self.device = "cpu"
+
     def _train(self, train_features, train_labels, val_features, val_labels, variables, *args, verbose=True, weights=None):
 
         pre = torch.tensor(
             np.linalg.lstsq(train_features.cpu().numpy(), train_labels.cpu(), rcond=None)[0],
-            requires_grad=True,
+            requires_grad=True, device=self.device
         )
         num_features = train_features.shape[1]
         presence_filter = torch.abs(pre) < 50
-        conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True)) + -10*torch.rand(num_features,num_features))[presence_filter]
-        conjs = torch.cat((conjs, -10*torch.rand(conjs.shape)), dim=-1)
-        net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]))
+        conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + -10*torch.rand(num_features,num_features, device=self.device))[presence_filter]
+        conjs = torch.cat((conjs, -10*torch.rand(conjs.shape, device=self.device)), dim=-1)
+        net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
         optimizer = optim.Adam(net.parameters(), lr=1e-2)
@@ -176,7 +184,7 @@ class RuleNNModel(BaseModel):
             # forward + backward + optimize
 
             e = min(epoch/(max_epoch/2),1)
-            batch_size = 10
+            batch_size = 100
             random.shuffle((train_index))
             net.train()
             for i in list(range(0, len(train_index), batch_size)):
@@ -238,12 +246,16 @@ class RuleNNModel(BaseModel):
 
     def _predict(self, features) -> np.ndarray:
         self.model.eval()
-        return self.model(features).detach().numpy()
+        return self.model(features).detach().cpu().numpy()
 
 
     @classmethod
     def _prepare_single(cls, data):
-        return torch.tensor(data).float()
+        if torch.cuda.is_available():
+            device = "cuda:0"
+        else:
+            device = "cpu"
+        return torch.tensor(data, device=device).float()
 
 
     @classmethod
@@ -260,9 +272,9 @@ class RuleNNModel(BaseModel):
             json.dump(
                 dict(
                     variables=self.variables,
-                    conjunctions=self.model.conjunctions.detach().numpy().tolist(),
-                    weights=self.model.rule_weights.detach().numpy().tolist(),
-                    base=self.model.base.detach().numpy().tolist()
+                    conjunctions=self.model.conjunctions.detach().cpu().numpy().tolist(),
+                    weights=self.model.rule_weights.detach().cpu().numpy().tolist(),
+                    base=self.model.base.detach().cpu().numpy().tolist()
                 ), fout
             )
 
