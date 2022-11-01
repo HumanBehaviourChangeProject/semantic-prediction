@@ -8,6 +8,7 @@ import pandas as pd
 from shiny import App, render, ui
 
 import matplotlib.pyplot as plt
+from matplotlib.gridspec import GridSpec
 
 ### Handle local imports
 
@@ -154,35 +155,85 @@ def server(input, output, session):
                 colname = f"{fname} ({valname})"
                 test[featurenames.index(colname)] = valfs(fvalue)
         test[featurenames.index('aggregate patient role')] = input.patientrole()
+        test[featurenames.index('Biochemical verification')] = input.verification()
+
+        # Shared attributes have been set, copy this to the control
         control = [i for i in test]  # deep copy
         control[featurenames.index('control')] = 1
-        # intervention attributes
+
+        # Set intervention-specific attributes
+        for x in input.intervention():
+            test[featurenames.index(x)] = True
+        for x in input.delivery():
+            test[featurenames.index(x)] = True
+        for x in input.source():
+            test[featurenames.index(x)] = True
+        if '11.1 Pharmacological support' in input.intervention():
+            if input.pharmacological() is not None:
+                test[featurenames.index(input.pharmacological())] = True
 
         # run prediction
         (testrls,testfit) = apply_rules(model,test,featurenames)
         (ctrlrls,ctrlfit) = apply_rules(model,control,featurenames)
 
-        for a in testrls:
-            print("LHS:",a[0],"\nIMPACT:",a[1],"\nCONFIT",a[2])
-        #return [testfit,ctrlfit,testrls]
         testimpacts = [a[1] for a in testrls]
         ctrlimpacts = [b[1] for b in ctrlrls]
         testnames = [a[0] for a  in testrls]
-        ctrlnames = [b[0] for b in testrls]
+        ctrlnames = [b[0] for b in ctrlrls]
 
-        f = plt.figure(figsize=(12,20))
-        axarr = f.add_subplot(1, 2, 1)
+        f = plt.figure()
+
+        gs = GridSpec(2, 6, figure=f)
+        ax1 = plt.subplot(gs.new_subplotspec((0, 0), colspan=1))
+        #axarr = f.add_subplot(2, 2, 1)
         plt.barh(list(range(0,-len(testimpacts),-1)),testimpacts,color=['red' if a < 0 else 'green' for a in testimpacts])
-        plt.title('Test ('+str(testfit)+')')
+        plt.title('Intervention: '+str(round(testfit,2))+'%')
         plt.xlabel('Rule impact (% cessation)')
         plt.yticks([])
 
-        axarr = f.add_subplot(1, 2, 2)
+        NO_RULES = 15
+
+        #axarr = f.add_subplot(2, 2, 2)
+        ax2 = plt.subplot(gs.new_subplotspec((0, 1), colspan=5))
+        #plt.plot()
+        plt.title('Intervention: Rules applied')
+        plt.ylim(0,NO_RULES)
+        plt.rc('font', size=6)
+        for i, ruleslst in enumerate(testnames):
+            if i+1 < NO_RULES:
+                ruleslststr = [x+ "(" +str(round(w,1))+")" for (x,w) in ruleslst]
+                impact = testimpacts[i]
+                rulestr = ' & '.join(ruleslststr)
+                rulestr = rulestr + ": " + str(round(impact,1))
+                plt.text(0,NO_RULES-(i+1),rulestr)
+        plt.xlabel('')
+        plt.xticks([])
+        plt.yticks([])
+
+        #axarr = f.add_subplot(2, 2, 3)
+        ax3 = plt.subplot(gs.new_subplotspec((1, 0), colspan=1))
         plt.barh(list(range(0,-len(ctrlimpacts),-1)),ctrlimpacts,color=['red' if a < 0 else 'green' for a in ctrlimpacts])
         plt.title('Control (' + str(ctrlfit) + ')')
         plt.xlabel('Rule impact (% cessation)')
         plt.yticks([])
 
+        #axarr = f.add_subplot(2, 2, 4)
+        ax4 = plt.subplot(gs.new_subplotspec((1, 1), colspan=5))
+        plt.title('Control: Rules applied')
+        plt.ylim(0, NO_RULES)
+        plt.rc('font', size=6)
+        for i, ruleslst in enumerate(ctrlnames):
+            if i + 1 < NO_RULES:
+                ruleslststr = [x + "(" + str(round(w, 1)) + ")" for (x, w) in ruleslst]
+                impact = testimpacts[i]
+                rulestr = ' & '.join(ruleslststr)
+                rulestr = rulestr + ": " + str(round(impact, 1))
+                plt.text(0, NO_RULES - (i + 1), rulestr)
+        plt.xlabel('')
+        plt.xticks([])
+        plt.yticks([])
+
+        f.tight_layout()
         return f
 
 
