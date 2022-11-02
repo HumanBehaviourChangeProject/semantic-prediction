@@ -22,13 +22,14 @@ class BaseModel(typing.Generic[T]):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, train_docs, val_docs, verbose=True, weights=None):
+    def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, train_docs, val_docs, verbose=True, weights=None, delay_val=True):
         return self._train(
             self._prepare_single(train_features),
             self._prepare_single(train_labels),
             self._prepare_single(val_features),
             self._prepare_single(val_labels),
-            train_docs, val_docs, verbose=verbose, weights=self._prepare_single(weights) if weights is not None else None
+            train_docs, val_docs, verbose=verbose, weights=self._prepare_single(weights) if weights is not None else None,
+            delay_val=delay_val
         )
 
     @abc.abstractmethod
@@ -91,26 +92,30 @@ def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, v
 
 
 def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], no_test, output_path: str, seed=None, weights=None):
-    os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
+    model = model_cls(variables)
+    output_path = os.path.join(output_path, model_cls.name())
+    _single_run(model, raw_features, raw_labels, no_test, output_path, seed = seed, weights = weights)
+
+
+def _single_run(model, raw_features: pd.DataFrame, raw_labels: np.ndarray, no_test, output_path: str, seed=None, weights=None, delay_val=True):
+    os.makedirs(output_path, exist_ok=True)
     index = raw_features.index
     train_index, test_index, val_index = get_data_split(raw_features.index, test=not no_test, seed=seed)
-    model = model_cls(variables)
-
     model.train(
         raw_features.iloc[train_index].values, raw_labels[train_index],
         raw_features.iloc[val_index].values, raw_labels[val_index],
-        raw_features.iloc[train_index].index, raw_features.iloc[val_index].index, weights=weights.iloc[train_index].values if weights is not None else None
+        raw_features.iloc[train_index].index, raw_features.iloc[val_index].index, weights=weights.iloc[train_index].values if weights is not None else None, delay_val=delay_val
     )
 
     if not no_test:
-        with open(os.path.join(output_path, model_cls.name(), "predictions_test.csv",), "w") as fout:
+        with open(os.path.join(output_path, "predictions_test.csv",), "w") as fout:
             y_pred = model.predict(raw_features.iloc[test_index].values)
             fout.write(",".join(("doc,arm", "prediction", "target")) + "\n")
             for t in zip(index[test_index].values, y_pred, raw_labels[test_index]):
                 fout.write(",".join((str(t[0][0]), str(t[0][1]), *map(str, t[1:]))) + "\n")
             fout.flush()
 
-    with open(os.path.join(output_path, model_cls.name(), "predictions_full.csv"), "w") as fout:
+    with open(os.path.join(output_path, "predictions_full.csv"), "w") as fout:
         y_pred = model.predict(raw_features.values)
         fout.write(",".join(("set", "doc,arm", "prediction", "target")) + "\n")
         for i, t in enumerate(zip(index, y_pred, raw_labels)):
@@ -118,7 +123,7 @@ def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, va
                                  str(t[0][1]), *map(str, t[1:]))) + "\n")
         fout.flush()
 
-    model.save(os.path.join(output_path, model_cls.name()))
+    model.save(output_path)
 
 
 def get_data_split(index, seed=None, test=False):

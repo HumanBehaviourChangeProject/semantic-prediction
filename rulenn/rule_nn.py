@@ -1,5 +1,6 @@
 import random
 
+import tqdm
 from torch import nn
 import torch
 import torch.optim as optim
@@ -14,14 +15,14 @@ import json
 
 class RuleNet(nn.Module):
     def __init__(
-        self, num_variables, num_conjunctions, names, config=None, append=None, device="cpu"
+        self, num_variables, num_conjunctions, names, config=None, append=None, device="cpu", fix_conjunctions=False
     ):
         super().__init__()
         self.device = device
         self.variables = names
         if config is None:
-            conj = - 18 * torch.rand(
-                (num_conjunctions, 2 * num_variables), requires_grad=True, device=device
+            conj = 3 - 6 * torch.rand(
+                (num_conjunctions, 2 * num_variables), requires_grad=not fix_conjunctions, device=device
             )
             rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True, device=device)
             base = 13 + 6 * torch.rand(1, requires_grad=True, device=device)
@@ -153,23 +154,27 @@ class RuleNNModel(BaseModel):
         else:
             self.device = "cpu"
 
-    def _train(self, train_features, train_labels, val_features, val_labels, variables, *args, verbose=True, weights=None):
+    def _train(self, train_features, train_labels, val_features, val_labels, variables, *args, verbose=True, weights=None, delay_val=True):
 
-        pre = torch.tensor(
-            np.linalg.lstsq(train_features.cpu().numpy(), train_labels.cpu(), rcond=None)[0],
-            requires_grad=True, device=self.device
-        )
+
         num_features = train_features.shape[1]
-        presence_filter = torch.abs(pre) < 50
-        conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + -10*torch.rand(num_features,num_features, device=self.device))[presence_filter]
-        conjs = torch.cat((conjs, -10*torch.rand(conjs.shape, device=self.device)), dim=-1)
-        net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
+
+        if self.model is None:
+            pre = torch.tensor(
+                np.linalg.lstsq(train_features.cpu().numpy(), train_labels.cpu(), rcond=None)[0],
+                requires_grad=True, device=self.device
+            )
+            presence_filter = torch.abs(pre) < 50
+            conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + -10*torch.rand(num_features,num_features, device=self.device))[presence_filter]
+            conjs = torch.cat((conjs, -10*torch.rand(conjs.shape, device=self.device)), dim=-1)
+            net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
+        else:
+            net = self.model
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
-        optimizer = optim.Adam(net.parameters(), lr=1e-2)
+        optimizer = optim.Adam(net.parameters(), lr=5e-3)
         keep_top = 5
         no_improvement = 0
-        epoch = 0
         best = []
         j = 0
         running_loss = 0.0
@@ -177,8 +182,8 @@ class RuleNNModel(BaseModel):
         max_epoch = 400
 
         train_index = list(range(train_features.shape[0]))
-
-        while epoch < max_epoch or no_improvement < max_epoch*0.2:
+        progress = tqdm.tqdm(list(range(max_epoch)))
+        for epoch in progress:
             # loop over the dataset multiple times
             # get the inputs; data is a list of [inputs, labels]
             # forward + backward + optimize
@@ -216,7 +221,7 @@ class RuleNNModel(BaseModel):
                 val_loss = criterion(val_out, val_labels.squeeze(-1))
                 val_rmse = val_criterion(val_out, val_labels.squeeze(-1))
 
-            if epoch > max_epoch:
+            if (not delay_val or epoch > max_epoch*0.75):
                 if not best or val_loss - best[-1][0] < -0.05:
                     best.append(
                         (
@@ -232,15 +237,21 @@ class RuleNNModel(BaseModel):
                 else:
                     no_improvement += 1
             # print statistics
-            if verbose and epoch % 10 == 0:
+            if verbose:
                 best_val_loss = best[0][0] if best else -1
-                print(
-                    f"{{epoch: {epoch},\tloss: {(running_loss / j):.2f},\tpenalties: {(running_penalties / j):.2f},\tval_loss: {val_loss.item():.2f},\t best_val_loss: {best_val_loss:0.2f},\tval_rmse: {val_loss.item()**0.5:.2f},\tval_mae: {val_rmse.item():.2f},\te: {e:.2f}}}"
+                progress.set_postfix_str(
+                    f"\tloss: {(running_loss / j):.2f},"
+                    f"\tpenalties: {(running_penalties / j):.2f},"
+                    f"\tval_loss: {val_loss.item():.2f},"
+                    f"\t best_val_loss: {best_val_loss:0.2f},"
+                    f"\tval_rmse: {val_loss.item()**0.5:.2f},"
+                    f"\tval_mae: {val_rmse.item():.2f},"
+                    f"\te: {e:.2f}}}",
+                    refresh=False
                 )
                 running_loss = 0.0
                 running_penalties = 0.0
                 j = 0
-            epoch += 1
 
         self.model = best[0][1]
 
@@ -279,11 +290,11 @@ class RuleNNModel(BaseModel):
             )
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, fix_conjunctions=False):
         with open(os.path.join(path), "r") as fin:
             d = json.load(fin)
             x = cls(d["variables"])
-            x.model = RuleNet(None, None, d["variables"], config=dict(conjunctions=torch.tensor(d["conjunctions"]),
-                                                  rule_weights=torch.tensor(d["weights"]),
-                                                  base=torch.tensor(d["base"])))
+            x.model = RuleNet(None, None, [v for v in d["variables"] if not v.startswith("not ")], config=dict(conjunctions=torch.tensor(d["conjunctions"], requires_grad=not fix_conjunctions, dtype=torch.float),
+                                                  rule_weights=torch.tensor(d["weights"], dtype=torch.float),
+                                                  base=torch.tensor(d["base"], dtype=torch.float)), fix_conjunctions=fix_conjunctions)
             return x
