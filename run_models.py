@@ -4,7 +4,7 @@ import random
 import pandas as pd
 import tqdm
 
-from base import cross_val, single_run, filter_features
+from base import cross_val, single_run, filter_features, _single_run
 from regression.mle import MLEModel
 from regression.random_forest import RFModel
 from rulenn.rule_nn import RuleNNModel
@@ -40,17 +40,11 @@ def single(*args, **kwargs):
     _single(*args, **kwargs)
 
 
-def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
+def _load_data(path, filters, weighted=False):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
 
-    if select is not None:
-        models_to_run = [m for m in model_classes if m.name() == select]
-    else:
-        models_to_run = model_classes
-
     features[np.isnan(features)] = 0
-
     if weighted:
         copy_features = pd.DataFrame()
         with open("data/analysed.csv") as fin:
@@ -64,9 +58,18 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
             labels = np.array([y for x in [[labels[i]] * value for i, (key, value) in enumerate(weights)] for y in x])
             print(copy_features)
 
-
     if filters is not None:
         features = filter_features(features)
+
+    return features, labels
+
+def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
+    if select is not None:
+        models_to_run = [m for m in model_classes if m.name() == select]
+    else:
+        models_to_run = model_classes
+
+    features, labels = _load_data(path, filters, weighted)
 
     variables = [x[1] for x in features.columns]
     for model_cls in models_to_run:
@@ -94,29 +97,12 @@ def cross(*args, **kwargs):
 
 
 def _cross(path, out, filters, select, no_test, weighted, **kwargs):
-    with open(path, "rb") as fin:
-        features, labels = pickle.load(fin)
+    features, labels = _load_data(path, filters, weighted)
 
     if select is not None:
         models_to_run = [m for m in model_classes if m.name() == select]
     else:
         models_to_run = model_classes
-
-    features[np.isnan(features)] = 0
-
-    if filters is not None:
-        features = filter_features(features)
-
-    if weighted:
-        copy_features = pd.DataFrame()
-        with open("data/analysed.csv") as fin:
-            reader = csv.reader(fin)
-            weights = {(int(a), int(b), c, d): (max(1, int(math.log2(float(v)))) if v != "" else 1) for a, b, c, d, v in reader}
-            weights = [(k, v) for k, v in weights.items() if k in features.index]
-
-            features = pd.DataFrame(y for x in [[features.loc[key]]*value for key, value in weights] for y in x)
-            labels = np.array([y for x in [[labels[i]] * value for i, (key, value) in enumerate(weights)] for y in x])
-            print(copy_features)
 
     variables = [x[1] for x in features.columns]
     cross_val(
@@ -154,15 +140,9 @@ def printrules(path):
 @click.option('-v', default=False, count=True)
 @click.option('--threshold', type=float, default = 0.1)
 def apply(path, checkpoint, filters, v, threshold):
-    model = RuleNNModel.load(checkpoint)
-    with open(path, "rb") as fin:
-        raw_features, raw_labels = pickle.load(fin)
-    raw_features[np.isnan(raw_features)] = 0
+    model = RuleNNModel.load(checkpoint, fix_conjunctions=False)
 
-    if filters:
-        features = filter_features(raw_features)
-    else:
-        features = raw_features
+    features, labels = _load_data(path, filters, False)
 
     for row in features.values:
         applied_rules, result = apply_rules(model, row, features.columns)
@@ -179,6 +159,16 @@ def apply(path, checkpoint, filters, v, threshold):
         print(f"The application of these rules resulted in the following prediction: {result:.2f}")
         print("\n---\n")
 
+
+@cli.command()
+@click.argument('path')
+@click.argument('checkpoint')
+@click.option('--filters', is_flag=True, default=False)
+@click.option('--weighted', is_flag=True, default=False)
+def fine_tune(path, checkpoint, filters, weighted):
+    model = RuleNNModel.load(checkpoint)
+    features, labels = _load_data(path, filters, weighted)
+    _single_run(model, features, labels, True, "/tmp/out", delay_val=False)
 
 @cli.command()
 @click.argument('n')
