@@ -13,7 +13,7 @@ def print_rules(df: pd.DataFrame):
         print(" & ".join(df.columns[:-1][row[1][:-1]>0.3]) + " => " + str(row[1][-1]))
 
 
-def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold=0.1,impact_threshold=1):
+def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold=0.1, impact_threshold=1):
     """
     Args:
         container: A trained instance of RuleNNModel
@@ -34,7 +34,8 @@ def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold
     conjunctions = container.model.non_lin(container.model.conjunctions)
     fits = container.model.calculate_fit(container._prepare_single([x]))
     for row, weight, fit in zip(conjunctions, container.model.rule_weights, fits[0]):
-        conjunctions = [(features[i], row[i].item()) for i in range(len(features)-1) if row[i] > feature_threshold]
+        indexes = [i for i in range(len(row)) if row[i].item() > feature_threshold]
+        conjunctions = [(features[i], row[i].item()) for i in indexes if i < len(features)]
         impact = fit.item()*weight.item()
         if abs(impact) > impact_threshold:
             rules.append((conjunctions, impact, fit.item()))

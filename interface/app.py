@@ -29,9 +29,9 @@ from dataprocessing.fuzzysets import FUZZY_SETS
 
 ###  Server state
 
-checkpoint = 'out/rulenn/examples/model_example.json'
+checkpoint = 'examples/model_consolidated.json'
 path = 'data/hbcp_gen.pkl'
-filters = True
+filters = False
 
 model = RuleNNModel.load(checkpoint)
 with open(path, "rb") as fin:
@@ -43,8 +43,14 @@ if filters:
 else:
     features = raw_features
 
+#Additional filter based on the loaded model. Maybe the only one really needed?
+retainedfeatures = [x for x in features.columns if x[1] in model.variables]
+features = features[retainedfeatures]
+
 featurenames = [x[1] for x in features.columns]
 featuresemantics = pd.read_csv('data/feature-semantics.csv')
+
+print("We have ",len(featurenames)," features.")
 
 intervention = featuresemantics.query('group == "intervention"')['featurename'].values.tolist()
 intervention = [x for x in intervention if x in featurenames]
@@ -168,20 +174,23 @@ def server(input, output, session):
             test[featurenames.index(x)] = True
         for x in input.source():
             test[featurenames.index(x)] = True
+        if input.outcome() is not None:
+            test[featurenames.index(input.outcome())] = True
         if '11.1 Pharmacological support' in input.intervention():
             if input.pharmacological() is not None:
                 test[featurenames.index(input.pharmacological())] = True
 
         # run prediction
-        (testrls,testfit) = apply_rules(model,test,featurenames)
-        (ctrlrls,ctrlfit) = apply_rules(model,control,featurenames)
+        extendednames = featurenames + ["not " + n for n in featurenames]
+        (testrls,testfit) = apply_rules(model,test,extendednames)
+        (ctrlrls,ctrlfit) = apply_rules(model,control,extendednames)
 
         testimpacts = [a[1] for a in testrls]
         ctrlimpacts = [b[1] for b in ctrlrls]
         testnames = [a[0] for a  in testrls]
         ctrlnames = [b[0] for b in ctrlrls]
 
-        f = plt.figure()
+        f = plt.figure(figsize=(20,50))
 
         gs = GridSpec(2, 6, figure=f)
         ax1 = plt.subplot(gs.new_subplotspec((0, 0), colspan=1))
@@ -191,7 +200,7 @@ def server(input, output, session):
         plt.xlabel('Rule impact (% cessation)')
         plt.yticks([])
 
-        NO_RULES = 15
+        NO_RULES = 20
 
         #axarr = f.add_subplot(2, 2, 2)
         ax2 = plt.subplot(gs.new_subplotspec((0, 1), colspan=5))
@@ -213,7 +222,7 @@ def server(input, output, session):
         #axarr = f.add_subplot(2, 2, 3)
         ax3 = plt.subplot(gs.new_subplotspec((1, 0), colspan=1))
         plt.barh(list(range(0,-len(ctrlimpacts),-1)),ctrlimpacts,color=['red' if a < 0 else 'green' for a in ctrlimpacts])
-        plt.title('Control (' + str(ctrlfit) + ')')
+        plt.title('Control (' + str(round(ctrlfit,2)) + ')')
         plt.xlabel('Rule impact (% cessation)')
         plt.yticks([])
 
