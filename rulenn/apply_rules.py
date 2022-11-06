@@ -13,7 +13,7 @@ def print_rules(df: pd.DataFrame):
         print(" & ".join(df.columns[:-1][row[1][:-1]>0.3]) + " => " + str(row[1][-1]))
 
 
-def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold=0.1, impact_threshold=1):
+def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold=0.1, impact_threshold=0.1):
     """
     Args:
         container: A trained instance of RuleNNModel

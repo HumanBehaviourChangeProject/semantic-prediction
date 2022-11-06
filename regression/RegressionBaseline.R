@@ -23,6 +23,8 @@ if (!require("factoextra")) install.packages("factoextra"); library(plotrix)
 df.attrs <- read.xlsx("cleaned_dataset_13Feb2022_notes_removed_control-2.xlsx", 
 								sheetIndex = 1)
 
+
+
 ## Various cleaning transformations
 
 df.clean <- df.attrs
@@ -56,6 +58,12 @@ df.clean$Proportion.identifying.as.female.gender[is.na(df.clean$Proportion.ident
 df.clean$Mean.number.of.times.tobacco.used[is.na(df.clean$Mean.number.of.times.tobacco.used)] <- mean(df.clean$Mean.number.of.times.tobacco.used,na.rm=T)
 # For the rest of the attributes, replace NAs with 0
 df.clean[is.na(df.clean)]=0
+
+
+# Query for problematic records
+
+df.clean[df.clean$Mean.number.of.times.tobacco.used>50,
+				 c("document_id","arm_id","Mean.number.of.times.tobacco.used")]
 
 
 

@@ -206,7 +206,7 @@ ui <- fluidPage(
 							 		),
 							 		
 							 		checkboxInput(
-							 			"Biochemical.verification",
+							 			"Biochemical verification",
 							 			"Biochemical verification"
 							 		),
 							 		

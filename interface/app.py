@@ -162,6 +162,8 @@ def server(input, output, session):
                 test[featurenames.index(colname)] = valfs(fvalue)
         test[featurenames.index('aggregate patient role')] = input.patientrole()
         test[featurenames.index('Biochemical verification')] = input.verification()
+        if input.outcome() is not None:
+            test[featurenames.index(input.outcome())] = True
 
         # Shared attributes have been set, copy this to the control
         control = [i for i in test]  # deep copy
@@ -174,8 +176,6 @@ def server(input, output, session):
             test[featurenames.index(x)] = True
         for x in input.source():
             test[featurenames.index(x)] = True
-        if input.outcome() is not None:
-            test[featurenames.index(input.outcome())] = True
         if '11.1 Pharmacological support' in input.intervention():
             if input.pharmacological() is not None:
                 test[featurenames.index(input.pharmacological())] = True
@@ -189,6 +189,25 @@ def server(input, output, session):
         ctrlimpacts = [b[1] for b in ctrlrls]
         testnames = [a[0] for a  in testrls]
         ctrlnames = [b[0] for b in ctrlrls]
+        testrulestrs = []
+        ctrlrulestrs = []
+
+        NO_RULES = 30
+
+        for i,ruleslst in enumerate(ctrlnames):
+            ruleslststr = [x+ "(" +str(round(w,1))+")" for (x,w) in ruleslst]
+            impact = ctrlimpacts[i]
+            rulestr = ' & '.join(ruleslststr)
+            rulestr = rulestr + ": " + str(round(impact,1))
+            ctrlrulestrs.append(rulestr)
+
+        for i,ruleslst in enumerate(testnames):
+            ruleslststr = [x+ "(" +str(round(w,1))+")" for (x,w) in ruleslst]
+            impact = testimpacts[i]
+            rulestr = ' & '.join(ruleslststr)
+            rulestr = rulestr + ": " + str(round(impact,1))
+            if rulestr not in ctrlrulestrs:
+                testrulestrs.append(rulestr)
 
         f = plt.figure(figsize=(20,50))
 
@@ -200,20 +219,14 @@ def server(input, output, session):
         plt.xlabel('Rule impact (% cessation)')
         plt.yticks([])
 
-        NO_RULES = 20
-
         #axarr = f.add_subplot(2, 2, 2)
         ax2 = plt.subplot(gs.new_subplotspec((0, 1), colspan=5))
         #plt.plot()
         plt.title('Intervention: Rules applied')
         plt.ylim(0,NO_RULES)
         plt.rc('font', size=6)
-        for i, ruleslst in enumerate(testnames):
+        for i, rulestr in enumerate(testrulestrs):
             if i+1 < NO_RULES:
-                ruleslststr = [x+ "(" +str(round(w,1))+")" for (x,w) in ruleslst]
-                impact = testimpacts[i]
-                rulestr = ' & '.join(ruleslststr)
-                rulestr = rulestr + ": " + str(round(impact,1))
                 plt.text(0,NO_RULES-(i+1),rulestr)
         plt.xlabel('')
         plt.xticks([])
@@ -222,7 +235,7 @@ def server(input, output, session):
         #axarr = f.add_subplot(2, 2, 3)
         ax3 = plt.subplot(gs.new_subplotspec((1, 0), colspan=1))
         plt.barh(list(range(0,-len(ctrlimpacts),-1)),ctrlimpacts,color=['red' if a < 0 else 'green' for a in ctrlimpacts])
-        plt.title('Control (' + str(round(ctrlfit,2)) + ')')
+        plt.title('Control: ' + str(round(ctrlfit,2)) + '%')
         plt.xlabel('Rule impact (% cessation)')
         plt.yticks([])
 
@@ -231,12 +244,8 @@ def server(input, output, session):
         plt.title('Control: Rules applied')
         plt.ylim(0, NO_RULES)
         plt.rc('font', size=6)
-        for i, ruleslst in enumerate(ctrlnames):
-            if i + 1 < NO_RULES:
-                ruleslststr = [x + "(" + str(round(w, 1)) + ")" for (x, w) in ruleslst]
-                impact = testimpacts[i]
-                rulestr = ' & '.join(ruleslststr)
-                rulestr = rulestr + ": " + str(round(impact, 1))
+        for i,rulestr in enumerate(ctrlrulestrs):
+            if i+1 < NO_RULES:
                 plt.text(0, NO_RULES - (i + 1), rulestr)
         plt.xlabel('')
         plt.xticks([])
