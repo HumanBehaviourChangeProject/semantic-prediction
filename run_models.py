@@ -62,7 +62,9 @@ def _load_data(path, filters, weighted=False, drop=None):
         features = filter_features(features)
 
     if drop is not None:
-        features.drop(columns=[features.columns[int(drop)]], inplace=True)
+        col = features.columns[int(drop)]
+        print("Exclude column:", col)
+        features.drop(columns=[col], inplace=True)
 
     return features, labels
 
