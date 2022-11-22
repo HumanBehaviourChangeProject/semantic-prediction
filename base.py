@@ -8,7 +8,7 @@ import numpy as np
 import typing
 import abc
 import random
-from dataprocessing.filters import feature_filter
+from dataprocessing.no_filters import feature_filter
 import multiprocessing as mp
 
 T = typing.TypeVar("T")

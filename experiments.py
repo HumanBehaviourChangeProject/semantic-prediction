@@ -49,3 +49,7 @@ features_less10 = [ (x,y) for x,y in zip(featurenames,featurecountvals) if y<10 
 
 print("Features with <= 10 values:", features_less10)
 
+plt.bar([x for (x,y) in features_less10],[y for (x,y) in features_less10])
+plt.xticks(fontsize=8, rotation=90)
+plt.subplots_adjust(bottom=0.4)
+

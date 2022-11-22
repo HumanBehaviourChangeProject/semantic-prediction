@@ -255,5 +255,7 @@ def server(input, output, session):
         return f
 
 
-# Start the application
+# to install shiny for python: pip install shiny
+# to upgrade shiny for python:  pip install --upgrade shiny htmltools
+# to start the application from the base directory, run: shiny run interface/app.py
 app = App(app_ui, server)
