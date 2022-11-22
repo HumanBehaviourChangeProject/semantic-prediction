@@ -40,7 +40,7 @@ def single(*args, **kwargs):
     _single(*args, **kwargs)
 
 
-def _load_data(path, filters, weighted=False):
+def _load_data(path, filters, weighted=False, drop=None):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
 
@@ -60,6 +60,11 @@ def _load_data(path, filters, weighted=False):
 
     if filters is not None:
         features = filter_features(features)
+
+    if drop is not None:
+        col = features.columns[int(drop)]
+        print("Exclude column:", col)
+        features.drop(columns=[col], inplace=True)
 
     return features, labels
 
@@ -92,12 +97,12 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
+@click.option('--drop-feature', default=None)
 def cross(*args, **kwargs):
     _cross(*args, **kwargs)
 
-
-def _cross(path, out, filters, select, no_test, weighted, **kwargs):
-    features, labels = _load_data(path, filters, weighted)
+def _cross(path, out, filters, select, no_test, weighted, drop_feature, **kwargs):
+    features, labels = _load_data(path, filters, weighted, drop_feature)
 
     if select is not None:
         models_to_run = [m for m in model_classes if m.name() == select]

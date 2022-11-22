@@ -21,11 +21,11 @@ class RuleNet(nn.Module):
         self.device = device
         self.variables = names
         if config is None:
-            conj = 3 - 6 * torch.rand(
+            conj = 1 - 20 * torch.rand(
                 (num_conjunctions, 2 * num_variables), requires_grad=not fix_conjunctions, device=device
             )
             rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True, device=device)
-            base = 13 + 6 * torch.rand(1, requires_grad=True, device=device)
+            base = 10 + 6 * torch.rand(1, requires_grad=True, device=device)
             if append is not None:
                 conj = torch.cat((conj, append[0]))
                 rw = torch.cat((rw, append[1]))
@@ -57,7 +57,7 @@ class RuleNet(nn.Module):
         super().to(device)
 
     def calculate_fit(self, x0):
-        mu = self.non_lin(self.conjunctions)
+        mu = self.dropout(self.non_lin(self.conjunctions))
         x = torch.cat((x0, 1 - x0), dim=1)
         x_pot = mu * (x[:,None,:] - 1) + 1  # torch.pow(x_exp, mu)
         return self.tnorm(x_pot, dim=-1)
@@ -66,29 +66,17 @@ class RuleNet(nn.Module):
         return self.apply_fit(self.calculate_fit(x0))
 
     def apply_fit(self, fit):
-        return 10 + torch.sum(self.rule_weights * fit, dim=-1).squeeze(-1)
+        return self.base + torch.sum(self.rule_weights * fit, dim=-1).squeeze(-1)
 
-    def print_rules(self, variables):
-        weights = self.non_lin(self.conjunctions)
-        for i in sorted(
-            range(self.conjunctions.shape[0]), key=lambda i: self.rule_weights[i]
-        ):
-            yield " & ".join(
-                v
-                for v, c in zip(variables + [f"not {v}" for v in variables], weights[i])
-                if c > 0.5
-            ) + " => " + str(self.rule_weights[i].item())
-
-    def calculate_penalties(self):
+    def calculate_penalties(self, scale=1.0):
         w = self.non_lin(self.conjunctions)
-        non_crips_penalty = 10 * torch.sum(
+        non_crips_penalty = scale * torch.sum(
             torch.sum(w * (1 - w), dim=-1), dim=0
         )  # penalty for non-crisp rules
-        m = torch.mean(
-            torch.stack((torch.sum(w, dim=-1) - 3, torch.zeros(w.shape[:-1], device=self.device))),
-            dim=0,
-        )
-        long_rules_penalty = 10*torch.norm(m) # penalty for long rules
+
+        m = torch.relu(torch.sum(w, dim=-1) - 3)#, torch.zeros(w.shape[:-1], device=self.device))
+
+        long_rules_penalty = torch.sum(m) # penalty for long rules
 
         contradiction_penalty = 0.5 * torch.sum(
             self.tnorm(w[:,:self.num_features] * w[:,self.num_features:] , dim=-1), dim=-1
@@ -98,12 +86,19 @@ class RuleNet(nn.Module):
             torch.sum(self.calculate_pure_fit(w, self.disjoint_filter + self.implication_filter), dim=-1), dim=-1
         )
 
-        penalties = 0.01*(
+        weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.abs(self.rule_weights)))
+
+        negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
+
+        penalties = 0.5 * scale * (
                 non_crips_penalty
                 + long_rules_penalty
+                + weight_penalty
                 + contradiction_penalty
+                + negative_weight_penalty
                 + disjoint_implied_penalty
         )
+
         return penalties
 
     def load_disjoint_filters(self, device=None):
@@ -149,6 +144,7 @@ class RuleNNModel(BaseModel):
 
     def __init__(self, *args, **kwargs):
         super(RuleNNModel, self).__init__(*args, **kwargs)
+        self.model = None
         if torch.cuda.is_available():
             self.device = "cuda:0"
         else:
@@ -172,7 +168,7 @@ class RuleNNModel(BaseModel):
             net = self.model
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
-        optimizer = optim.Adam(net.parameters(), lr=5e-3)
+        optimizer = optim.Adam(net.parameters(), lr=1e-3)
         keep_top = 5
         no_improvement = 0
         best = []
@@ -205,7 +201,7 @@ class RuleNNModel(BaseModel):
                 base_loss = torch.sum(base_loss, dim=-1)**0.5
 
                 #loss = base_loss + penalties
-                penalties = e * net.calculate_penalties()
+                penalties = net.calculate_penalties(e)
 
                 loss = base_loss + penalties
                 loss.backward()
@@ -276,7 +272,8 @@ class RuleNNModel(BaseModel):
     def print_rules(self, threshold=0.2):
         names = self.model.variables + ["not " + n for n in self.model.variables]
         for (row, weight) in zip(self.model.non_lin(self.model.conjunctions), self.model.rule_weights):
-            print(" & ".join([n for n, v in zip(names,row) if v > threshold]) + " -> " + str(weight.item()))
+            if math.fabs(weight) > 1e-3:
+                print(" & ".join([n for n, v in zip(names,row) if v > threshold]) + " -> " + str(weight.item()))
 
     def save(self, path:str):
         with open(os.path.join(path, "model.json"), "w") as fout:
