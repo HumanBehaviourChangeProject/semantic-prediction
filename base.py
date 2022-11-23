@@ -62,6 +62,14 @@ def filter_features(features):
     return features[headers]
 
 
+def filter_threshold(features, threshold):
+    featurecounts = features.astype(bool).sum(axis=0)
+    headers = [v for (i,v) in enumerate(features.columns) if featurecounts[i] > threshold]
+    print(f"Number of features before filter: {len(featurecounts)}, filter threshold: {threshold}, "
+          f"number after: {len(headers)}.")
+    return features[headers]
+
+
 def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], output_path: str, no_test):
 
     outs = {c: np.empty(0) for c in model_classes}

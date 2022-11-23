@@ -2,13 +2,15 @@ import inspect
 import pathlib
 import pickle
 import sys
+from os import listdir
 
 import numpy as np
 import pandas as pd
-from shiny import App, render, ui
+import statistics
 
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
+import seaborn as sns
 
 ### Handle local imports
 
@@ -53,3 +55,19 @@ plt.bar([x for (x,y) in features_less10],[y for (x,y) in features_less10])
 plt.xticks(fontsize=8, rotation=90)
 plt.subplots_adjust(bottom=0.4)
 
+
+# Process results of ablation study
+outdir = 'out 2'
+allvals = {}
+for f in listdir(outdir):
+    if 'out' in f:
+        datafile = outdir + '/' + f + '/rulenn/crossval.txt'
+        with open(datafile,'r') as infile:
+            data = infile.read().split('\n')
+            data = [abs(float(x)) for x in data]
+            allvals[f] = data
+
+df = pd.DataFrame(allvals)
+
+ax = sns.boxplot(df)
+ax.tick_params(axis='x', rotation=90)

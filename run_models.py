@@ -4,7 +4,7 @@ import random
 import pandas as pd
 import tqdm
 
-from base import cross_val, single_run, filter_features, _single_run
+from base import cross_val, single_run, filter_features, _single_run, filter_threshold
 from regression.mle import MLEModel
 from regression.random_forest import RFModel
 from rulenn.rule_nn import RuleNNModel
@@ -40,7 +40,7 @@ def single(*args, **kwargs):
     _single(*args, **kwargs)
 
 
-def _load_data(path, filters, weighted=False, drop=None):
+def _load_data(path, filters, weighted=False, drop=None, filter_feature_threshold=None):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
 
@@ -60,6 +60,10 @@ def _load_data(path, filters, weighted=False, drop=None):
 
     if filters is not None:
         features = filter_features(features)
+
+    if filter_feature_threshold is not None:
+        filter_feature_threshold = int(filter_feature_threshold)
+        features = filter_threshold(features, filter_feature_threshold)
 
     if drop is not None:
         col = features.columns[int(drop)]
@@ -98,11 +102,12 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
 @click.option('--drop-feature', default=None)
+@click.option('--filter-feature-threshold', default=None)
 def cross(*args, **kwargs):
     _cross(*args, **kwargs)
 
-def _cross(path, out, filters, select, no_test, weighted, drop_feature, **kwargs):
-    features, labels = _load_data(path, filters, weighted, drop_feature)
+def _cross(path, out, filters, select, no_test, weighted, drop_feature, filter_feature_threshold, **kwargs):
+    features, labels = _load_data(path, filters, weighted, drop_feature, filter_feature_threshold)
 
     if select is not None:
         models_to_run = [m for m in model_classes if m.name() == select]
