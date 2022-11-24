@@ -65,7 +65,7 @@ for f in listdir(outdir):
             data = infile.read().split('\n')
             data = [abs(float(x)) for x in data]
             allvals[f] = data
-![](feathresholds2.png)
+
 df = pd.DataFrame(allvals)
 
 import re
