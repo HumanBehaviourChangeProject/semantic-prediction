@@ -157,6 +157,7 @@ def get_data_split(index, seed=None, test=False):
 
 def get_cross_split(index, num_splits=3):
     documents = list({i[0] for i in index})
+    random.seed(42)
     random.shuffle(documents)
     splits = np.array_split(documents, num_splits)
     return [[i for i, t in enumerate(index) if t[0] in split] for split in splits]

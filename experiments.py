@@ -47,17 +47,16 @@ plt.bar(featurenames,featurecountvals)
 plt.xticks(fontsize=8, rotation=90)
 plt.subplots_adjust(bottom=0.4)
 
-features_less10 = [ (x,y) for x,y in zip(featurenames,featurecountvals) if y<10 ]
-
-print("Features with <= 10 values:", features_less10)
-
-plt.bar([x for (x,y) in features_less10],[y for (x,y) in features_less10])
-plt.xticks(fontsize=8, rotation=90)
-plt.subplots_adjust(bottom=0.4)
+#features_less10 = [ (x,y) for x,y in zip(featurenames,featurecountvals) if y<10 ]
+#print("Features with <= 10 values:", features_less10)
+#plt.bar([x for (x,y) in features_less10],[y for (x,y) in features_less10])
+#plt.xticks(fontsize=8, rotation=90)
+#plt.subplots_adjust(bottom=0.4)
 
 
-# Process results of ablation study
-outdir = 'out 2'
+# Process results of ablation study, threshold study
+#outdir = 'out_features'
+outdir = 'out 4'
 allvals = {}
 for f in listdir(outdir):
     if 'out' in f:
@@ -66,8 +65,17 @@ for f in listdir(outdir):
             data = infile.read().split('\n')
             data = [abs(float(x)) for x in data]
             allvals[f] = data
-
+![](feathresholds2.png)
 df = pd.DataFrame(allvals)
 
-ax = sns.boxplot(df)
+import re
+
+dfcols = list(df.columns.values)
+dfcols.sort(key=lambda col_string :  int(col_string.replace('out_','')))
+
+ax = sns.boxplot(df[dfcols])
 ax.tick_params(axis='x', rotation=90)
+
+plt.savefig('feathresholds2.png')
+
+
