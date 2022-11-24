@@ -74,7 +74,7 @@ def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, v
 
     outs = {c: np.empty(0) for c in model_classes}
 
-    chunks = get_cross_split(raw_features.index, 10)
+    chunks = get_cross_split(raw_features.index, 5)
     for i in tqdm.tqdm(list(range(len(chunks)))):
         train_index = [
             c for j in range(len(chunks)) for c in chunks[j] if i != j and i != j - 1

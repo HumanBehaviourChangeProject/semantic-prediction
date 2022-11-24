@@ -76,6 +76,6 @@ dfcols.sort(key=lambda col_string :  int(col_string.replace('out_','')))
 ax = sns.boxplot(df[dfcols])
 ax.tick_params(axis='x', rotation=90)
 
-plt.savefig('feathresholds2.png')
+plt.savefig('feathresholds4.png')
 
 
