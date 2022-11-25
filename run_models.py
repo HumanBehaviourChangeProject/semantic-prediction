@@ -36,6 +36,9 @@ def cli():
 @click.option('--filters', is_flag=True, default=False)
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
+@click.option('--drop-feature', default=None)
+@click.option('--filter-feature-threshold', default=None)
+@click.option('--save-name',default=None)
 def single(*args, **kwargs):
     _single(*args, **kwargs)
 
@@ -72,13 +75,15 @@ def _load_data(path, filters, weighted=False, drop=None, filter_feature_threshol
 
     return features, labels
 
-def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
+
+def _single(path, select, filters, no_test, weighted, seed=None, drop=None,
+            filter_feature_threshold=None, save_name=None, **kwargs):
     if select is not None:
         models_to_run = [m for m in model_classes if m.name() == select]
     else:
         models_to_run = model_classes
 
-    features, labels = _load_data(path, filters, weighted)
+    features, labels = _load_data(path, filters, weighted, drop, filter_feature_threshold)
 
     variables = [x[1] for x in features.columns]
     for model_cls in models_to_run:
@@ -88,7 +93,7 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
             labels[:, 0],
             variables,
             no_test,
-            "out",
+            "out/"+save_name if save_name else 'out',
             #weights=weights,
             seed=seed
         )
