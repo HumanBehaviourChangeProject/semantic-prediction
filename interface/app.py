@@ -29,7 +29,7 @@ from dataprocessing.fuzzysets import FUZZY_SETS
 
 ###  Server state
 
-checkpoint = 'examples/model_consolidated.json'
+checkpoint = 'out/0/rulenn/model.json'
 path = 'data/hbcp_gen.pkl'
 filters = False
 
@@ -159,7 +159,8 @@ def server(input, output, session):
             fs = FUZZY_SETS.get(fname)
             for valname, valfs in list(fs.items()):
                 colname = f"{fname} ({valname})"
-                test[featurenames.index(colname)] = valfs(fvalue)
+                if colname in featurenames:
+                    test[featurenames.index(colname)] = valfs(fvalue)
         test[featurenames.index('aggregate patient role')] = input.patientrole()
         test[featurenames.index('Biochemical verification')] = input.verification()
         if input.outcome() is not None:

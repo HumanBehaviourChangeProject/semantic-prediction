@@ -86,16 +86,16 @@ class RuleNet(nn.Module):
             torch.sum(self.calculate_pure_fit(w, self.disjoint_filter + self.implication_filter), dim=-1), dim=-1
         )
 
-        weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.abs(self.rule_weights)))
+        #weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.abs(self.rule_weights)))
 
-        negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
+        #negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
 
         penalties = 0.5 * scale * (
                 non_crips_penalty
                 + long_rules_penalty
-                + weight_penalty
+                #+ weight_penalty
                 + contradiction_penalty
-                + negative_weight_penalty
+                #+ negative_weight_penalty
                 + disjoint_implied_penalty
         )
 

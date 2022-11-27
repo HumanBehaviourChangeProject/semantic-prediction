@@ -29,16 +29,16 @@ from rulenn.rule_nn import RuleNNModel
 
 ###  Server state
 
-#checkpoint = 'examples/model_consolidated.json'
+checkpoint = 'out/0/rulenn/model.json'
 path = 'data/hbcp_gen.pkl'
 filters = False
 
-#model = RuleNNModel.load(checkpoint)
+model = RuleNNModel.load(checkpoint)
 with open(path, "rb") as fin:
     raw_features, raw_labels = pickle.load(fin)
 raw_features[np.isnan(raw_features)] = 0
 
-
+model.print_rules()
 
 
 # Process results of ablation study, threshold study
