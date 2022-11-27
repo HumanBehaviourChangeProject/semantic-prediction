@@ -163,7 +163,7 @@ class RuleNNModel(BaseModel):
             presence_filter = torch.abs(pre) < 50
             conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + -10*torch.rand(num_features,num_features, device=self.device))[presence_filter]
             conjs = torch.cat((conjs, -10*torch.rand(conjs.shape, device=self.device)), dim=-1)
-            net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
+            net = RuleNet(num_features, 150-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
         else:
             net = self.model
         criterion = nn.MSELoss()
