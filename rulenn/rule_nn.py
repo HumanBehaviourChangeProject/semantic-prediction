@@ -90,9 +90,9 @@ class RuleNet(nn.Module):
 
         negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
 
-        penalties = 0.5 * scale * (
-                non_crips_penalty
-                + long_rules_penalty
+        penalties = scale * (
+                5 * non_crips_penalty
+                + 5 * long_rules_penalty
                 + weight_penalty
                 + contradiction_penalty
                 + negative_weight_penalty
