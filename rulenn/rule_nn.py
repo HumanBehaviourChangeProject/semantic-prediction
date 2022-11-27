@@ -175,7 +175,7 @@ class RuleNNModel(BaseModel):
         j = 0
         running_loss = 0.0
         running_penalties = 0.0
-        max_epoch = 1000
+        max_epoch = 2000
 
         train_index = list(range(train_features.shape[0]))
         progress = tqdm.tqdm(list(range(max_epoch)))
