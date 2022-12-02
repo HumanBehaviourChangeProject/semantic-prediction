@@ -92,9 +92,17 @@ def main():
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
 
-    has_outcome = (~labels.isna()).values
+    threshold = 30
 
-    write_fuzzy(features[has_outcome].astype(float), labels[has_outcome].astype(float))
+    feature_filter = features.count(axis=0) > threshold
+    sufficiently_represented_features = features.columns[feature_filter]
+
+    print("\n".join(f"{x}: {y}" for x,y in zip((x[1] for x in features.columns[~feature_filter]), features.count(axis=0)[~feature_filter])))
+
+    has_outcome = (~labels.isna()).values
+    features = features[sufficiently_represented_features][has_outcome].astype(float)
+    labels = labels[has_outcome].astype(float)
+    write_fuzzy(features, labels)
 
 
 if __name__ == "__main__":
