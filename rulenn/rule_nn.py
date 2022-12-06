@@ -72,13 +72,13 @@ class RuleNet(nn.Module):
 
     def calculate_penalties(self, scale=1.0):
         w = self.non_lin(self.conjunctions)
-        non_crips_penalty = scale * torch.sum(
+        non_crips_penalty = scale * torch.mean(
             torch.sum(w * (1 - w), dim=-1), dim=0
         )  # penalty for non-crisp rules
 
         m = torch.relu(torch.sum(w, dim=-1) - 3)#, torch.zeros(w.shape[:-1], device=self.device))
 
-        long_rules_penalty = torch.sum(m) # penalty for long rules
+        long_rules_penalty = torch.mean(m) # penalty for long rules
 
         contradiction_penalty = 0.5 * torch.sum(
             self.tnorm(w[:,:self.num_features] * w[:,self.num_features:] , dim=-1), dim=-1
@@ -92,7 +92,7 @@ class RuleNet(nn.Module):
 
         negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
 
-        penalties = 0.5 * scale * (
+        penalties = 10 * scale * (
                 non_crips_penalty
                 + long_rules_penalty
                 + weight_penalty
@@ -159,13 +159,13 @@ class RuleNNModel(BaseModel):
 
         if self.model is None:
             pre = torch.tensor(
-                np.linalg.lstsq(train_features.cpu().numpy(), train_labels.cpu(), rcond=None)[0],
+                np.linalg.lstsq((train_features + 1e-5*torch.rand(train_features.shape)).cpu().numpy(), train_labels.cpu(), rcond=None)[0],
                 requires_grad=True, device=self.device
             )
             presence_filter = torch.abs(pre) < 50
             conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + -10*torch.rand(num_features,num_features, device=self.device))[presence_filter]
             conjs = torch.cat((conjs, -10*torch.rand(conjs.shape, device=self.device)), dim=-1)
-            net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
+            net = RuleNet(num_features, 150-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
         else:
             net = self.model
         criterion = nn.MSELoss()
@@ -191,20 +191,14 @@ class RuleNNModel(BaseModel):
             random.shuffle((train_index))
             net.train()
             for i in list(range(0, len(train_index), batch_size)):
-                optimizer.zero_grad()
+
                 batch_index = train_index[i : i + batch_size]
                 batch_labels = train_labels[batch_index].squeeze(-1)
+
+                optimizer.zero_grad()
                 outputs = net(train_features[batch_index])
-
-                base_loss = (outputs - batch_labels)**2
-                if weights is not None:
-                    base_loss = base_loss * weights[batch_index].squeeze(-1)
-
-                base_loss = torch.sum(base_loss, dim=-1)**0.5
-
-                #loss = base_loss + penalties
+                base_loss = criterion(outputs, batch_labels)
                 penalties = net.calculate_penalties(e)
-
                 loss = base_loss + penalties
                 loss.backward()
                 optimizer.step()
@@ -219,7 +213,7 @@ class RuleNNModel(BaseModel):
                 val_loss = criterion(val_out, val_labels.squeeze(-1))
                 val_rmse = val_criterion(val_out, val_labels.squeeze(-1))
 
-            if (not delay_val or epoch > max_epoch*0.75):
+            if (not delay_val or epoch > max_epoch*0.5):
                 if not best or val_loss - best[-1][0] < -0.05:
                     best.append(
                         (
