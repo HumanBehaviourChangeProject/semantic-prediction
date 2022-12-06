@@ -72,13 +72,13 @@ class RuleNet(nn.Module):
 
     def calculate_penalties(self, scale=1.0):
         w = self.non_lin(self.conjunctions)
-        non_crips_penalty = scale * torch.mean(
+        non_crips_penalty = scale * torch.sum(
             torch.sum(w * (1 - w), dim=-1), dim=0
         )  # penalty for non-crisp rules
 
         m = torch.relu(torch.sum(w, dim=-1) - 3)#, torch.zeros(w.shape[:-1], device=self.device))
 
-        long_rules_penalty = torch.mean(m) # penalty for long rules
+        long_rules_penalty = torch.sum(m) # penalty for long rules
 
         contradiction_penalty = 0.5 * torch.sum(
             self.tnorm(w[:,:self.num_features] * w[:,self.num_features:] , dim=-1), dim=-1
@@ -92,7 +92,7 @@ class RuleNet(nn.Module):
 
         negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
 
-        penalties = 10 * scale * (
+        penalties = 0.5 * scale * (
                 non_crips_penalty
                 + long_rules_penalty
                 + weight_penalty
