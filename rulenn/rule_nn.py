@@ -59,8 +59,8 @@ class RuleNet(nn.Module):
         super().to(device)
 
     def calculate_fit(self, x0):
-        mu = self.dropout(self.non_lin(self.conjunctions))
-        x = torch.cat((x0, 1 - x0), dim=1)
+        mu = self.non_lin(self.conjunctions)
+        x = self.dropout(torch.cat((x0, 1 - x0), dim=1))
         x_pot = mu * (x[:,None,:] - 1) + 1  # torch.pow(x_exp, mu)
         return self.tnorm(x_pot, dim=-1)
 
