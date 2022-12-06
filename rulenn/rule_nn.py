@@ -213,7 +213,7 @@ class RuleNNModel(BaseModel):
                 val_loss = criterion(val_out, val_labels.squeeze(-1))
                 val_rmse = val_criterion(val_out, val_labels.squeeze(-1))
 
-            if (not delay_val or epoch > max_epoch*0.5):
+            if (not delay_val or epoch > max_epoch*0.75):
                 if not best or val_loss - best[-1][0] < -0.05:
                     best.append(
                         (
