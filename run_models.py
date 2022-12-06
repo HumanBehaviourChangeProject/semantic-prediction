@@ -36,6 +36,7 @@ def cli():
 @click.option('--filters', is_flag=True, default=False)
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
+@click.option('--out', default="out")
 def single(*args, **kwargs):
     _single(*args, **kwargs)
 
@@ -68,7 +69,7 @@ def _load_data(path, filters, weighted=False, drop=None):
 
     return features, labels
 
-def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
+def _single(path, select, filters, no_test, weighted, seed=None, out="out", **kwargs):
     if select is not None:
         models_to_run = [m for m in model_classes if m.name() == select]
     else:
@@ -84,7 +85,7 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
             labels[:, 0],
             variables,
             no_test,
-            "out",
+            out,
             #weights=weights,
             seed=seed
         )
@@ -133,7 +134,7 @@ def cross_full(path, select):
 
 @cli.command()
 @click.argument('path')
-def printrules(path):
+def print_rules(path):
     model = RuleNNModel.load(path)
     model.print_rules()
 
@@ -186,7 +187,7 @@ def runcopy(n, *args, **kwargs):
     import shutil
     for i in tqdm.tqdm(list(range(int(n)))):
         _single(*args, seed=random.randint(1,1000), **kwargs)
-        shutil.copyfile("out/rulenn/model.json", f"out/rulenn/model.{i+69}.json")
+        shutil.copyfile("out/rulenn/model.json", f"out/rulenn/model.{i}.json")
 
 if __name__ == '__main__':
     cli()
