@@ -23,7 +23,7 @@ class RuleNet(nn.Module):
         self.device = device
         self.variables = names
         if config is None:
-            conj = 1 - 20 * torch.rand(
+            conj = 3 - 6 * torch.rand(
                 (num_conjunctions, 2 * num_variables), requires_grad=not fix_conjunctions, device=device
             )
             rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True, device=device)
@@ -163,9 +163,9 @@ class RuleNNModel(BaseModel):
                 requires_grad=True, device=self.device
             )
             presence_filter = torch.abs(pre) < 50
-            conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + -10*torch.rand(num_features,num_features, device=self.device))[presence_filter]
-            conjs = torch.cat((conjs, -10*torch.rand(conjs.shape, device=self.device)), dim=-1)
-            net = RuleNet(num_features, 150-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
+            conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + 1 - 2*torch.rand(num_features,num_features, device=self.device))[presence_filter]
+            conjs = torch.cat((conjs, 3-10*torch.rand(conjs.shape, device=self.device)), dim=-1)
+            net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
         else:
             net = self.model
         criterion = nn.MSELoss()
