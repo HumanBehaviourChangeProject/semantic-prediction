@@ -33,7 +33,7 @@ def cli():
 @cli.command()
 @click.argument('path')
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
 @click.option('--out', default="out")
@@ -180,7 +180,7 @@ def fine_tune(path, checkpoint, filters, weighted):
 @click.argument('n')
 @click.argument('path')
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
 def runcopy(n, *args, **kwargs):
