@@ -2,7 +2,8 @@ import os
 import sys
 import json
 import math
-
+import tqdm
+import numpy as np
 def sigmoid(x):
   return 1 / (1 + math.exp(-x))
 
@@ -14,42 +15,41 @@ def logit(mu0):
 def consolidate(path):
     rulessets = []
     runs = 0
-    for f in os.listdir(path):
-        if f.startswith("model."):
-            runs += 1
-            with open(os.path.join(path, f), "r") as fin:
-                d = json.load(fin)
-                for conjunctions, weight in zip(d["conjunctions"], d["weights"]):
-                    rules = []
-                    items = d["variables"] + [f"not {v}" for v in d["variables"]]
-                    conjunctions = {v for c,v in zip(conjunctions, items) if sigmoid(float(c)) > 0.2}
-                    rules.append((conjunctions, float(weight)))
-                    rulessets.append(rules)
-
-
+    for f in tqdm.tqdm([f for f in os.listdir(path) if f.startswith("out_")]):
+        runs += 1
+        with open(os.path.join(path,f,"rulenn","model.json"), "r") as fin:
+            d = json.load(fin)
+            items = d["variables"] + [f"not {v}" for v in d["variables"]]
+            rulessets.append([({v for c,v in zip(conjunction, items) if sigmoid(float(c)) > 0.2}, float(weight)) for conjunction, weight in zip(d["conjunctions"], d["weights"])])
 
     transactions = [con for rule in rulessets for con, _ in rule]
-    #items = {x for r in transactions for x in r}
-    initial_item_sets = [frozenset({x}) for x in items]
-
-    tres = runs*0.1
-    current = [i for i,l in ((i, sum(1 for t in transactions if i.issubset(t))) for i in initial_item_sets) if l > tres]
+    tres = runs*0.80
+    current = [(set(), transactions)]
     print(tres)
     frequents = []
     while current:
-        nxt = [(i,l) for i,l in ((i, sum(1 for t in transactions if i.issubset(t))) for i in current) if l > tres]
-        frequents += list(nxt)
-        current = [frozenset({n}.union(i)) for i,l in nxt for n in items if n > max(i)]
-
+        new_current = []
+        for itemset, contained_in in current:
+            missing = sorted({c for cs in contained_in for c in cs if not itemset or c > max(itemset)})
+            some_frequent = False
+            for n in missing:
+                new_item_set = itemset.union({n})
+                new_contained_in = [t for t in contained_in if n in t]
+                if len(new_contained_in) > tres:
+                    new_current.append((new_item_set, new_contained_in))
+                    some_frequent = True
+            frequents.append((itemset, len(contained_in)))
+        current = new_current
     with open(os.path.join(path, "frequent_model.json"), "w") as fout:
         conjunctions = []
         weights = []
 
-        for itms, frequency in frequents:
+        for itms, contained_in in frequents:
             conjunctions.append([100 if c in itms else -100 for c in items])
             match_weights = [w for rule in rulessets for con, w in rule if itms.issubset(con)]
-            avg = sum(match_weights)/len(match_weights)
-            print(" & ".join(itms), "->", avg)
+            avg = np.mean(match_weights)
+            std = np.std(match_weights)
+            print(contained_in," & ".join(itms), "->", avg, std)
             weights.append(avg)
         json.dump(dict(
             variables=items,
