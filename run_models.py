@@ -169,7 +169,7 @@ def apply(path, checkpoint, filters, v, threshold):
 @cli.command()
 @click.argument('path')
 @click.argument('checkpoint')
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--weighted', is_flag=True, default=False)
 def fine_tune(path, checkpoint, filters, weighted):
     model = RuleNNModel.load(checkpoint)
