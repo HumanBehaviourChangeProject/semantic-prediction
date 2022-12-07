@@ -39,7 +39,7 @@ class RuleNet(nn.Module):
         self.conjunctions = nn.Parameter(conj)
         self.num_rules = conj.shape[0]
         self.rule_weights = nn.Parameter(rw)
-        self.base = nn.Parameter(base)
+        self.base = 10 #nn.Parameter(base)
         self.non_lin = nn.Sigmoid()
         self.dropout = nn.Dropout(0.1)
 
@@ -278,7 +278,7 @@ class RuleNNModel(BaseModel):
                     variables=self.variables,
                     conjunctions=self.model.conjunctions.detach().cpu().numpy().tolist(),
                     weights=self.model.rule_weights.detach().cpu().numpy().tolist(),
-                    base=self.model.base.detach().cpu().numpy().tolist()
+                    base=self.model.base
                 ), fout
             )
 
