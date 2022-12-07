@@ -40,7 +40,7 @@ class RuleNet(nn.Module):
         self.num_rules = conj.shape[0]
         self.rule_weights = nn.Parameter(rw)
         self.base = nn.Parameter(base)
-        self.non_lin = nn.Sigmoid()
+        self.non_lin = nn.Hardsigmoid()
         self.dropout = nn.Dropout(0.1)
 
         self.implication_filter = self.load_implication_filters()
@@ -78,7 +78,7 @@ class RuleNet(nn.Module):
 
         m = torch.relu(torch.sum(w, dim=-1) - 3)#, torch.zeros(w.shape[:-1], device=self.device))
 
-        long_rules_penalty = torch.sum(m) # penalty for long rules
+        long_rules_penalty = torch.mean(m) # penalty for long rules
 
         contradiction_penalty = 0.5 * torch.sum(
             self.tnorm(w[:,:self.num_features] * w[:,self.num_features:] , dim=-1), dim=-1
@@ -92,7 +92,7 @@ class RuleNet(nn.Module):
 
         negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
 
-        penalties = 0.5 * scale * (
+        penalties = scale * (
                 non_crips_penalty
                 + long_rules_penalty
                 + weight_penalty
@@ -186,7 +186,7 @@ class RuleNNModel(BaseModel):
             # get the inputs; data is a list of [inputs, labels]
             # forward + backward + optimize
 
-            e = min(epoch/(max_epoch/2),1)
+            e = sigmoid(-3+6*epoch/(max_epoch)) if epoch > max_epoch/4 else 0
             batch_size = 100
             random.shuffle((train_index))
             net.train()
