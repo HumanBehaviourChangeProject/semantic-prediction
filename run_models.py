@@ -50,7 +50,7 @@ def _load_data(path, filters, weighted=False, drop=None):
         copy_features = pd.DataFrame()
         with open("data/analysed.csv") as fin:
             reader = csv.reader(fin)
-            weights = {(int(a), int(b), c, d): (max(1, int(math.log2(float(v)))) if v != "" else 1) for a, b, c, d, v in reader}
+            weights = {(int(a), int(b), c, d): (max(1, int(math.log(float(v),5))) if v != "" else 1) for a, b, c, d, v in reader}
             weights = [(k, v) for k, v in weights.items() if k in features.index]
             #keys, values = zip(*weights)
             #weights = pd.DataFrame(values, index=keys)

@@ -78,7 +78,7 @@ class RuleNet(nn.Module):
 
         m = torch.relu(torch.sum(w, dim=-1) - 3)#, torch.zeros(w.shape[:-1], device=self.device))
 
-        long_rules_penalty = torch.mean(m) # penalty for long rules
+        long_rules_penalty = 10*torch.mean(m) # penalty for long rules
 
         contradiction_penalty = 0.5 * torch.sum(
             self.tnorm(w[:,:self.num_features] * w[:,self.num_features:] , dim=-1), dim=-1
