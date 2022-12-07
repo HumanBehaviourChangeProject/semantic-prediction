@@ -40,7 +40,7 @@ class RuleNet(nn.Module):
         self.num_rules = conj.shape[0]
         self.rule_weights = nn.Parameter(rw)
         self.base = nn.Parameter(base)
-        self.non_lin = nn.Hardsigmoid()
+        self.non_lin = nn.Sigmoid()
         self.dropout = nn.Dropout(0.1)
 
         self.implication_filter = self.load_implication_filters()
@@ -78,7 +78,7 @@ class RuleNet(nn.Module):
 
         m = torch.relu(torch.sum(w, dim=-1) - 3)#, torch.zeros(w.shape[:-1], device=self.device))
 
-        long_rules_penalty = 10*torch.mean(m) # penalty for long rules
+        long_rules_penalty = (1-scale)*torch.sum(m) # penalty for long rules
 
         contradiction_penalty = 0.5 * torch.sum(
             self.tnorm(w[:,:self.num_features] * w[:,self.num_features:] , dim=-1), dim=-1
