@@ -30,7 +30,7 @@ from rulenn.apply_rules import apply_rules
 from dataprocessing.fuzzysets import FUZZY_SETS
 
 ###  Which model are we testing
-checkpoint = 'out/2/rulenn/model.json'
+checkpoint = 'examples/model_final.json'
 path = 'data/hbcp_gen.pkl'
 
 model = RuleNNModel.load(checkpoint)
