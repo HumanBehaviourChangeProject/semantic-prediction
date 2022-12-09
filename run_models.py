@@ -142,7 +142,7 @@ def print_rules(path):
 @cli.command()
 @click.argument('path')
 @click.argument('checkpoint')
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('-v', default=False, count=True)
 @click.option('--threshold', type=float, default = 0.1)
 def apply(path, checkpoint, filters, v, threshold):
