@@ -147,7 +147,7 @@ def print_rules(path):
 @click.option('--threshold', type=float, default = 0.1)
 def apply(path, checkpoint, filters, v, threshold):
     model = RuleNNModel.load(checkpoint, fix_conjunctions=False)
-
+    model.model.eval()
     features, labels = _load_data(path, filters, False)
 
     for row in features.values:
