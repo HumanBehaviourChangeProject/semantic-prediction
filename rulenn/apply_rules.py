@@ -33,7 +33,7 @@ def apply_rules(container:RuleNNModel, x:np.ndarray, features, feature_threshold
     conjunctions = container.model.non_lin(container.model.conjunctions)
     fits = container.model.calculate_fit(container._prepare_single([x]))
     for row, weight, fit in zip(conjunctions, container.model.rule_weights, fits[0]):
-        conjunctions = [(features[i][1], row[i].item()) for i in range(len(features)-1) if row[i] > feature_threshold]
+        conjunctions = [(features[i], row[i].item()) for i in range(len(features)-1) if row[i] > feature_threshold]
         impact = fit.item()*weight.item()
         rules.append((conjunctions, impact, fit))
     return sorted(rules, key=lambda x:-abs(x[1])), container.model.apply_fit(fits).item()
