@@ -146,12 +146,12 @@ def print_rules(path):
 @click.option('-v', default=False, count=True)
 @click.option('--threshold', type=float, default = 0.1)
 def apply(path, checkpoint, filters, v, threshold):
-    model = RuleNNModel.load(checkpoint, fix_conjunctions=False)
-    model.model.eval()
+    container = RuleNNModel.load(checkpoint, fix_conjunctions=False)
+    container.model.eval()
     features, labels = _load_data(path, filters, False)
 
     for row in features.values:
-        applied_rules, result = apply_rules(model, row, model.variables)
+        applied_rules, result = apply_rules(container, row, container.variables)
         print("The following rules were applied:")
         for conjunction, impact, fit in applied_rules:
             if impact > 0:
