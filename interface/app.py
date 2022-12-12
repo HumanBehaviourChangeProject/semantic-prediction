@@ -29,11 +29,13 @@ from dataprocessing.fuzzysets import FUZZY_SETS
 
 ###  Server state
 
-checkpoint = 'examples/model_consolidated.json'
+checkpoint = 'examples/model_final.json'
 path = 'data/hbcp_gen.pkl'
 filters = False
 
 model = RuleNNModel.load(checkpoint)
+model.model.eval()  # Run in production mode
+
 with open(path, "rb") as fin:
     raw_features, raw_labels = pickle.load(fin)
 raw_features[np.isnan(raw_features)] = 0
@@ -159,7 +161,8 @@ def server(input, output, session):
             fs = FUZZY_SETS.get(fname)
             for valname, valfs in list(fs.items()):
                 colname = f"{fname} ({valname})"
-                test[featurenames.index(colname)] = valfs(fvalue)
+                if colname in featurenames:
+                    test[featurenames.index(colname)] = valfs(fvalue)
         test[featurenames.index('aggregate patient role')] = input.patientrole()
         test[featurenames.index('Biochemical verification')] = input.verification()
         if input.outcome() is not None:
