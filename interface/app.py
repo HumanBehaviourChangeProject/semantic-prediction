@@ -29,11 +29,13 @@ from dataprocessing.fuzzysets import FUZZY_SETS
 
 ###  Server state
 
-checkpoint = 'out/0/rulenn/model.json'
+checkpoint = 'examples/model_final.json'
 path = 'data/hbcp_gen.pkl'
 filters = False
 
 model = RuleNNModel.load(checkpoint)
+model.model.eval()  # Run in production mode
+
 with open(path, "rb") as fin:
     raw_features, raw_labels = pickle.load(fin)
 raw_features[np.isnan(raw_features)] = 0
