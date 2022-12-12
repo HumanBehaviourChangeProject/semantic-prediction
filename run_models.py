@@ -33,9 +33,10 @@ def cli():
 @cli.command()
 @click.argument('path')
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
+@click.option('--out', default="out")
 def single(*args, **kwargs):
     _single(*args, **kwargs)
 
@@ -49,7 +50,7 @@ def _load_data(path, filters, weighted=False, drop=None):
         copy_features = pd.DataFrame()
         with open("data/analysed.csv") as fin:
             reader = csv.reader(fin)
-            weights = {(int(a), int(b), c, d): (max(1, int(math.log2(float(v)))) if v != "" else 1) for a, b, c, d, v in reader}
+            weights = {(int(a), int(b), c, d): (max(1, int(math.log(float(v),5))) if v != "" else 1) for a, b, c, d, v in reader}
             weights = [(k, v) for k, v in weights.items() if k in features.index]
             #keys, values = zip(*weights)
             #weights = pd.DataFrame(values, index=keys)
@@ -68,7 +69,7 @@ def _load_data(path, filters, weighted=False, drop=None):
 
     return features, labels
 
-def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
+def _single(path, select, filters, no_test, weighted, seed=None, out="out", **kwargs):
     if select is not None:
         models_to_run = [m for m in model_classes if m.name() == select]
     else:
@@ -84,7 +85,7 @@ def _single(path, select, filters, no_test, weighted, seed=None, **kwargs):
             labels[:, 0],
             variables,
             no_test,
-            "out",
+            out,
             #weights=weights,
             seed=seed
         )
@@ -133,7 +134,7 @@ def cross_full(path, select):
 
 @cli.command()
 @click.argument('path')
-def printrules(path):
+def print_rules(path):
     model = RuleNNModel.load(path)
     model.print_rules()
 
@@ -141,16 +142,16 @@ def printrules(path):
 @cli.command()
 @click.argument('path')
 @click.argument('checkpoint')
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('-v', default=False, count=True)
 @click.option('--threshold', type=float, default = 0.1)
 def apply(path, checkpoint, filters, v, threshold):
-    model = RuleNNModel.load(checkpoint, fix_conjunctions=False)
-
+    container = RuleNNModel.load(checkpoint, fix_conjunctions=False)
+    container.model.eval()
     features, labels = _load_data(path, filters, False)
 
     for row in features.values:
-        applied_rules, result = apply_rules(model, row, features.columns)
+        applied_rules, result = apply_rules(container, row, container.variables)
         print("The following rules were applied:")
         for conjunction, impact, fit in applied_rules:
             if impact > 0:
@@ -168,7 +169,7 @@ def apply(path, checkpoint, filters, v, threshold):
 @cli.command()
 @click.argument('path')
 @click.argument('checkpoint')
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--weighted', is_flag=True, default=False)
 def fine_tune(path, checkpoint, filters, weighted):
     model = RuleNNModel.load(checkpoint)
@@ -179,14 +180,14 @@ def fine_tune(path, checkpoint, filters, weighted):
 @click.argument('n')
 @click.argument('path')
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
 def runcopy(n, *args, **kwargs):
     import shutil
     for i in tqdm.tqdm(list(range(int(n)))):
         _single(*args, seed=random.randint(1,1000), **kwargs)
-        shutil.copyfile("out/rulenn/model.json", f"out/rulenn/model.{i+69}.json")
+        shutil.copyfile("out/rulenn/model.json", f"out/rulenn/model.{i}.json")
 
 if __name__ == '__main__':
     cli()

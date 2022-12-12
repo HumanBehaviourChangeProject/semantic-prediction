@@ -62,6 +62,50 @@ def _at_least_10(collection):
         return all(vs >= 10 for vs in c.values())
     return True
 
+def filter_and_cluster(features, labels):
+
+    with open("data/all_feature_info.csv") as fin:
+        reader = csv.DictReader(fin)
+        feature_list = list(reader)
+    clusters = {d["Aggregate Feature"] for d in feature_list if d["Aggregate Feature"]}
+    features_maps = {d["Feature ID"]:[c for c in features.columns if str(c[0]) == d["Feature ID"]][0] for d in feature_list if d["Aggregate Feature"]}
+    cluster_mappings = {f:[features_maps[d["Feature ID"]] for d in feature_list if d["Aggregate Feature"] == f] for f in clusters}
+    print(clusters)
+
+    for f in clusters:
+        features[(f,f)] = features[[*cluster_mappings[f]]].any(axis=1)
+
+    threshold = 30
+
+    feature_filter = features.sum(axis=0) > threshold
+    sufficiently_represented_features = features.columns[feature_filter]
+
+    print("\n".join(f"Dropping feature \"{x}\" due to low evidence ({y} instances)" for x, y in
+                    zip((x[1] for x in features.columns[~feature_filter]),
+                        features.sum(axis=0)[~feature_filter])))
+
+    has_outcome = (~labels.isna()).values
+    features = features[sufficiently_represented_features][has_outcome].astype(
+        float)
+    labels = labels[has_outcome].astype(float)
+
+    return features, labels
+
+
+def filter_pregnancy_trials(features, labels):
+    filter_trials = features[[("Relapse Prevention Trial","Relapse Prevention Trial"),
+                   ("Relapse Prevention Trial(Mixed)", "Relapse Prevention Trial(Mixed)"),
+                   ("Pregnancy trial", "Pregnancy trial"),
+                   ("Pregnancy trial (Mixed)", "Pregnancy trial (Mixed)")]].any(axis=1)
+
+    pregnancy_documents = [i[0] for i in features[filter_trials].index]
+    documents_to_drop = pd.Series({i:i[0] in pregnancy_documents for i in features.index})
+
+    print("Dropping the following pregnancy or relapse trials:")
+    print("\t* " + ("\n\t* ".join({c[2] for c in features[documents_to_drop].index})))
+    return features[~documents_to_drop], labels[~documents_to_drop]
+
+
 def main():
     reader = AttributeReader()
     ds = reader.read()
@@ -92,9 +136,10 @@ def main():
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
 
-    has_outcome = (~labels.isna()).values
+    features, labels = filter_pregnancy_trials(features, labels)
 
-    write_fuzzy(features[has_outcome].astype(float), labels[has_outcome].astype(float))
+    features, labels = filter_and_cluster(features, labels)
+    write_fuzzy(features, labels)
 
 
 if __name__ == "__main__":
