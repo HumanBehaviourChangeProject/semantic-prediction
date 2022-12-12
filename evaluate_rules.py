@@ -33,7 +33,8 @@ from dataprocessing.fuzzysets import FUZZY_SETS
 checkpoint = 'examples/model_final.json'
 path = 'data/hbcp_gen.pkl'
 
-model = RuleNNModel.load(checkpoint)
+model = RuleNNModel.load(checkpoint,fix_conjunctions=False)
+model.model.eval()
 with open(path, "rb") as fin:
     raw_features, raw_labels = pickle.load(fin)
 raw_features[np.isnan(raw_features)] = 0

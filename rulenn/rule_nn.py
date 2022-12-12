@@ -21,7 +21,7 @@ class RuleNet(nn.Module):
         self.device = device
         self.variables = names
         if config is None:
-            conj = 1 - 20 * torch.rand(
+            conj = 3 - 6 * torch.rand(
                 (num_conjunctions, 2 * num_variables), requires_grad=not fix_conjunctions, device=device
             )
             rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True, device=device)
@@ -37,7 +37,7 @@ class RuleNet(nn.Module):
         self.conjunctions = nn.Parameter(conj)
         self.num_rules = conj.shape[0]
         self.rule_weights = nn.Parameter(rw)
-        self.base = nn.Parameter(base)
+        self.base = 10 #nn.Parameter(base)
         self.non_lin = nn.Sigmoid()
         self.dropout = nn.Dropout(0.1)
 
@@ -57,8 +57,8 @@ class RuleNet(nn.Module):
         super().to(device)
 
     def calculate_fit(self, x0):
-        mu = self.dropout(self.non_lin(self.conjunctions))
-        x = torch.cat((x0, 1 - x0), dim=1)
+        mu = self.non_lin(self.conjunctions)
+        x = self.dropout(torch.cat((x0, 1 - x0), dim=1))
         x_pot = mu * (x[:,None,:] - 1) + 1  # torch.pow(x_exp, mu)
         return self.tnorm(x_pot, dim=-1)
 
@@ -76,7 +76,7 @@ class RuleNet(nn.Module):
 
         m = torch.relu(torch.sum(w, dim=-1) - 3)#, torch.zeros(w.shape[:-1], device=self.device))
 
-        long_rules_penalty = torch.sum(m) # penalty for long rules
+        long_rules_penalty = (1-scale)*torch.sum(m) # penalty for long rules
 
         contradiction_penalty = 0.5 * torch.sum(
             self.tnorm(w[:,:self.num_features] * w[:,self.num_features:] , dim=-1), dim=-1
@@ -91,8 +91,6 @@ class RuleNet(nn.Module):
         negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
 
         penalties = scale * (
-                5 * non_crips_penalty
-                + 5 * long_rules_penalty
                 + weight_penalty
                 + contradiction_penalty
                 + negative_weight_penalty
@@ -157,13 +155,13 @@ class RuleNNModel(BaseModel):
 
         if self.model is None:
             pre = torch.tensor(
-                np.linalg.lstsq(train_features.cpu().numpy(), train_labels.cpu(), rcond=None)[0],
+                np.linalg.lstsq((train_features.cpu() + 1e-5*torch.rand(train_features.shape)).cpu().numpy(), train_labels.cpu(), rcond=None)[0],
                 requires_grad=True, device=self.device
             )
             presence_filter = torch.abs(pre) < 50
-            conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + -10*torch.rand(num_features,num_features, device=self.device))[presence_filter]
-            conjs = torch.cat((conjs, -10*torch.rand(conjs.shape, device=self.device)), dim=-1)
-            net = RuleNet(num_features, 150-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
+            conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + 1 - 2*torch.rand(num_features,num_features, device=self.device))[presence_filter]
+            conjs = torch.cat((conjs, 3-10*torch.rand(conjs.shape, device=self.device)), dim=-1)
+            net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
         else:
             net = self.model
         criterion = nn.MSELoss()
@@ -184,25 +182,19 @@ class RuleNNModel(BaseModel):
             # get the inputs; data is a list of [inputs, labels]
             # forward + backward + optimize
 
-            e = min(epoch/(max_epoch/2),1)
+            e = sigmoid(-3+6*epoch/(max_epoch)) if epoch > max_epoch/4 else 0
             batch_size = 100
             random.shuffle((train_index))
             net.train()
             for i in list(range(0, len(train_index), batch_size)):
-                optimizer.zero_grad()
+
                 batch_index = train_index[i : i + batch_size]
                 batch_labels = train_labels[batch_index].squeeze(-1)
+
+                optimizer.zero_grad()
                 outputs = net(train_features[batch_index])
-
-                base_loss = (outputs - batch_labels)**2
-                if weights is not None:
-                    base_loss = base_loss * weights[batch_index].squeeze(-1)
-
-                base_loss = torch.sum(base_loss, dim=-1)**0.5
-
-                #loss = base_loss + penalties
+                base_loss = criterion(outputs, batch_labels)
                 penalties = net.calculate_penalties(e)
-
                 loss = base_loss + penalties
                 loss.backward()
                 optimizer.step()
@@ -282,7 +274,7 @@ class RuleNNModel(BaseModel):
                     variables=self.variables,
                     conjunctions=self.model.conjunctions.detach().cpu().numpy().tolist(),
                     weights=self.model.rule_weights.detach().cpu().numpy().tolist(),
-                    base=self.model.base.detach().cpu().numpy().tolist()
+                    base=self.model.base
                 ), fout
             )
 

@@ -12,9 +12,13 @@ def write_csv(doc_attrs:pd.DataFrame):
             header.append(f"{b}({a})")
     doc_attrs.to_csv("data/model_input_data.csv", header=header, index_label=("document_id", "arm_id", "document", "arm"), na_rep="-")
 
+
 def write_fuzzy(features, labels):
     with open("data/hbcp_gen.pkl", "wb") as fout:
         pickle.dump((features, np.array(labels)), fout)
+    with open("data/hbcp_gen.csv", "w") as fout:
+        full_frame = pd.concat((features, pd.DataFrame(np.array(labels), columns=(("Outcome","Outcome"),), index=features.index)), axis=1).reset_index(names=["doc_id", "arm_id", "doc", "arm"])
+        full_frame.to_csv(fout)
 
 
 def write_bct_contexts(attributes, cleaned, doc_attrs, doc_name_map, arm_name_map):

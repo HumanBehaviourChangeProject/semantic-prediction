@@ -387,7 +387,8 @@ class SomaticCleaner(KeyBasedAttributeCleaner):
         )
         if fuzz.partial_ratio(arm_name, "placebo") > 80:
             d['placebo'] = 1
-        d.update(self.any_as_presence.get_value(ident, data, arm_name))
+        d2 = self.any_as_presence.get_value(ident, data, arm_name)
+        d.update(d2)
         d = self._process_with_key_list(ident, data, initial_dictionary=d)
         patch = self.any_as_presence.get_value(6080694, data, arm_name)[6080694]
         if d["gum"] or d["lozenge"] or d["e_cigarette"] or patch or d["inhaler"]:

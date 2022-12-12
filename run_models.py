@@ -33,12 +33,10 @@ def cli():
 @cli.command()
 @click.argument('path')
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
-@click.option('--drop-feature', default=None)
-@click.option('--filter-feature-threshold', default=None)
-@click.option('--save-name',default=None)
+@click.option('--out', default="out")
 def single(*args, **kwargs):
     _single(*args, **kwargs)
 
@@ -52,7 +50,7 @@ def _load_data(path, filters, weighted=False, drop=None, filter_feature_threshol
         copy_features = pd.DataFrame()
         with open("data/analysed.csv") as fin:
             reader = csv.reader(fin)
-            weights = {(int(a), int(b), c, d): (max(1, int(math.log2(float(v)))) if v != "" else 1) for a, b, c, d, v in reader}
+            weights = {(int(a), int(b), c, d): (max(1, int(math.log(float(v),5))) if v != "" else 1) for a, b, c, d, v in reader}
             weights = [(k, v) for k, v in weights.items() if k in features.index]
             #keys, values = zip(*weights)
             #weights = pd.DataFrame(values, index=keys)
@@ -75,15 +73,13 @@ def _load_data(path, filters, weighted=False, drop=None, filter_feature_threshol
 
     return features, labels
 
-
-def _single(path, select, filters, no_test, weighted, seed=None, drop=None,
-            filter_feature_threshold=None, save_name=None, **kwargs):
+def _single(path, select, filters, no_test, weighted, seed=None, out="out", **kwargs):
     if select is not None:
         models_to_run = [m for m in model_classes if m.name() == select]
     else:
         models_to_run = model_classes
 
-    features, labels = _load_data(path, filters, weighted, drop, filter_feature_threshold)
+    features, labels = _load_data(path, filters, weighted)
 
     variables = [x[1] for x in features.columns]
     for model_cls in models_to_run:
@@ -93,7 +89,7 @@ def _single(path, select, filters, no_test, weighted, seed=None, drop=None,
             labels[:, 0],
             variables,
             no_test,
-            "out/"+save_name if save_name else 'out',
+            out,
             #weights=weights,
             seed=seed
         )
@@ -143,7 +139,7 @@ def cross_full(path, select):
 
 @cli.command()
 @click.argument('path')
-def printrules(path):
+def print_rules(path):
     model = RuleNNModel.load(path)
     model.print_rules()
 
@@ -178,7 +174,7 @@ def apply(path, checkpoint, filters, v, threshold):
 @cli.command()
 @click.argument('path')
 @click.argument('checkpoint')
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--weighted', is_flag=True, default=False)
 def fine_tune(path, checkpoint, filters, weighted):
     model = RuleNNModel.load(checkpoint)
@@ -189,14 +185,14 @@ def fine_tune(path, checkpoint, filters, weighted):
 @click.argument('n')
 @click.argument('path')
 @click.option('--select', default=None, help="Available options: " + ", ".join(m.name() for m in model_classes))
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('--no-test', is_flag=True, default=False)
 @click.option('--weighted', is_flag=True, default=False)
 def runcopy(n, *args, **kwargs):
     import shutil
     for i in tqdm.tqdm(list(range(int(n)))):
         _single(*args, seed=random.randint(1,1000), **kwargs)
-        shutil.copyfile("out/rulenn/model.json", f"out/rulenn/model.{i+69}.json")
+        shutil.copyfile("out/rulenn/model.json", f"out/rulenn/model.{i}.json")
 
 if __name__ == '__main__':
     cli()
