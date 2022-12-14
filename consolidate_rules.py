@@ -2,8 +2,12 @@ import os
 import sys
 import json
 import math
+from rulenn.rule_nn import RuleNNModel
+from base import _load_data
+import torch
 import tqdm
 import numpy as np
+
 def sigmoid(x):
   return 1 / (1 + math.exp(-x))
 
@@ -15,9 +19,14 @@ def logit(mu0):
 def consolidate(path):
     rulessets = []
     runs = 0
+    features, labels = _load_data("data/hbcp_gen.pkl", None, False)
+    features = torch.cat((torch.tensor(features.values), torch.tensor(features.values)), dim=1)
     for f in tqdm.tqdm([f for f in os.listdir(path) if f.startswith("out_")]):
         runs += 1
         with open(os.path.join(path,f,"rulenn","model.json"), "r") as fin:
+            checkpoint = os.path.join(path, f)
+            container = RuleNNModel.load(checkpoint, fix_conjunctions=False)
+            fit = container.model.calculate_fit(features)
             d = json.load(fin)
             items = d["variables"] + [f"not {v}" for v in d["variables"]]
             rulessets.append([({v for c,v in zip(conjunction, items) if sigmoid(float(c)) > 0.2}, float(weight)) for conjunction, weight in zip(d["conjunctions"], d["weights"])])
