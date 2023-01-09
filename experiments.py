@@ -29,7 +29,7 @@ from rulenn.rule_nn import RuleNNModel
 
 ###  Server state
 
-checkpoint = 'out/0/rulenn/model.json'
+checkpoint = 'examples/model_final.json'
 path = 'data/hbcp_gen.pkl'
 filters = False
 
