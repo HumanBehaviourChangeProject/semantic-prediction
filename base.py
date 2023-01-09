@@ -8,8 +8,9 @@ import numpy as np
 import typing
 import abc
 import random
-from dataprocessing.no_filters import feature_filter
-import multiprocessing as mp
+from dataprocessing.filters import feature_filter
+import math
+import pickle
 
 T = typing.TypeVar("T")
 
@@ -21,7 +22,6 @@ class BaseModel(typing.Generic[T]):
     def _train(self, train_features: T, train_labels: T, val_features: T, val_labels: T, train_docs, val_docs, verbose=True, weights=None):
         raise NotImplementedError
 
-    @abc.abstractmethod
     def train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray, val_labels: np.ndarray, train_docs, val_docs, verbose=True, weights=None, delay_val=True):
         return self._train(
             self._prepare_single(train_features),
@@ -32,7 +32,6 @@ class BaseModel(typing.Generic[T]):
             delay_val=delay_val
         )
 
-    @abc.abstractmethod
     def predict(self, features: np.ndarray) -> np.ndarray:
         return self._predict(
             self._prepare_single(features)
@@ -98,6 +97,31 @@ def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, v
         with open(outfile, "w") as fout:
             fout.write("\n".join(map(str, values)))
 
+
+
+def _load_data(path, filters, weighted=False, drop=None):
+    with open(path, "rb") as fin:
+        features, labels = pickle.load(fin)
+
+    features[np.isnan(features)] = 0
+    if weighted:
+        copy_features = pd.DataFrame()
+        with open("data/analysed.csv") as fin:
+            reader = csv.reader(fin)
+            weights = {(int(a), int(b), c, d): (max(1, int(math.log2(float(v)))) if v != "" else 1) for a, b, c, d, v in reader}
+            weights = [(k, v) for k, v in weights.items() if k in features.index]
+            features = pd.DataFrame(y for x in [[features.loc[key]]*value for key, value in weights] for y in x)
+            labels = np.array([y for x in [[labels[i]] * value for i, (key, value) in enumerate(weights)] for y in x])
+
+    if filters is not None:
+        features = filter_features(features)
+
+    if drop is not None:
+        col = features.columns[int(drop)]
+        print("Exclude column:", col)
+        features.drop(columns=[col], inplace=True)
+
+    return features, labels
 
 def single_run(model_cls, raw_features: pd.DataFrame, raw_labels: np.ndarray, variables: typing.List[typing.AnyStr], no_test, output_path: str, seed=None, weights=None):
     model = model_cls(variables)

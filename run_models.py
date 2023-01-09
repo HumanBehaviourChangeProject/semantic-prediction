@@ -73,6 +73,7 @@ def _load_data(path, filters, weighted=False, drop=None, filter_feature_threshol
 
     return features, labels
 
+
 def _single(path, select, filters, no_test, weighted, seed=None, out="out", **kwargs):
     if select is not None:
         models_to_run = [m for m in model_classes if m.name() == select]
@@ -147,16 +148,16 @@ def print_rules(path):
 @cli.command()
 @click.argument('path')
 @click.argument('checkpoint')
-@click.option('--filters', is_flag=True, default=False)
+@click.option('--filters', is_flag=True, default=None)
 @click.option('-v', default=False, count=True)
 @click.option('--threshold', type=float, default = 0.1)
 def apply(path, checkpoint, filters, v, threshold):
-    model = RuleNNModel.load(checkpoint, fix_conjunctions=False)
-
+    container = RuleNNModel.load(checkpoint, fix_conjunctions=False)
+    container.model.eval()
     features, labels = _load_data(path, filters, False)
 
     for row in features.values:
-        applied_rules, result = apply_rules(model, row, features.columns)
+        applied_rules, result = apply_rules(container, row, container.variables)
         print("The following rules were applied:")
         for conjunction, impact, fit in applied_rules:
             if impact > 0:
