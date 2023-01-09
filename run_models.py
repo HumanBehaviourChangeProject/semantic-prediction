@@ -4,7 +4,7 @@ import random
 import pandas as pd
 import tqdm
 
-from base import cross_val, single_run, filter_features, _single_run
+from base import cross_val, single_run, _load_data, _single_run
 from regression.mle import MLEModel
 from regression.random_forest import RFModel
 from rulenn.rule_nn import RuleNNModel
@@ -41,33 +41,7 @@ def single(*args, **kwargs):
     _single(*args, **kwargs)
 
 
-def _load_data(path, filters, weighted=False, drop=None):
-    with open(path, "rb") as fin:
-        features, labels = pickle.load(fin)
 
-    features[np.isnan(features)] = 0
-    if weighted:
-        copy_features = pd.DataFrame()
-        with open("data/analysed.csv") as fin:
-            reader = csv.reader(fin)
-            weights = {(int(a), int(b), c, d): (max(1, int(math.log(float(v),5))) if v != "" else 1) for a, b, c, d, v in reader}
-            weights = [(k, v) for k, v in weights.items() if k in features.index]
-            #keys, values = zip(*weights)
-            #weights = pd.DataFrame(values, index=keys)
-            #weights = weights.astype(float)
-            features = pd.DataFrame(y for x in [[features.loc[key]]*value for key, value in weights] for y in x)
-            labels = np.array([y for x in [[labels[i]] * value for i, (key, value) in enumerate(weights)] for y in x])
-            print(copy_features)
-
-    if filters is not None:
-        features = filter_features(features)
-
-    if drop is not None:
-        col = features.columns[int(drop)]
-        print("Exclude column:", col)
-        features.drop(columns=[col], inplace=True)
-
-    return features, labels
 
 def _single(path, select, filters, no_test, weighted, seed=None, out="out", **kwargs):
     if select is not None:
