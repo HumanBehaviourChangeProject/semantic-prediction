@@ -8,3 +8,6 @@ torchmetrics
 statsmodels
 click
 tqdm
+shiny
+matplotlib
+seaborn
