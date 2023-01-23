@@ -190,6 +190,7 @@ def server(input, output, session):
 
         testimpacts = [a[1] for a in testrls]
         ctrlimpacts = [b[1] for b in ctrlrls]
+        testonlyimpacts = [a[1] for a in testrls if a not in ctrlrls]
         testnames = [a[0] for a  in testrls]
         ctrlnames = [b[0] for b in ctrlrls]
         testrulestrs = []
@@ -198,62 +199,63 @@ def server(input, output, session):
         NO_RULES = 30
 
         for i,ruleslst in enumerate(ctrlnames):
-            ruleslststr = [x+ "(" +str(round(w,1))+")" for (x,w) in ruleslst]
+            ruleslststr = [x for (x,w) in ruleslst] #+"(" +str(round(w,1))+")"
             impact = ctrlimpacts[i]
             rulestr = ' & '.join(ruleslststr)
             rulestr = rulestr + ": " + str(round(impact,1))
             ctrlrulestrs.append(rulestr)
 
         for i,ruleslst in enumerate(testnames):
-            ruleslststr = [x+ "(" +str(round(w,1))+")" for (x,w) in ruleslst]
+            ruleslststr = [x for (x,w) in ruleslst] # + "(" +str(round(w,1))+")"
             impact = testimpacts[i]
             rulestr = ' & '.join(ruleslststr)
             rulestr = rulestr + ": " + str(round(impact,1))
             if rulestr not in ctrlrulestrs:
                 testrulestrs.append(rulestr)
 
-        f = plt.figure(figsize=(20,50))
+        f = plt.figure(figsize=(30,100))
 
-        gs = GridSpec(2, 6, figure=f)
+        gs = GridSpec(4, 6, figure=f)
         ax1 = plt.subplot(gs.new_subplotspec((0, 0), colspan=1))
         #axarr = f.add_subplot(2, 2, 1)
-        plt.barh(list(range(0,-len(testimpacts),-1)),testimpacts,color=['red' if a < 0 else 'green' for a in testimpacts])
-        plt.title('Intervention: '+str(round(testfit,2))+'%')
-        plt.xlabel('Rule impact (% cessation)')
-        plt.yticks([])
+        plt.barh(list(range(0,-(len(testonlyimpacts)+1),-1)),testonlyimpacts+[0],color=['red' if a < 0 else 'green' for a in testonlyimpacts])
+        ax1.set_title('Intervention: '+str(round(testfit,2))+'%')
+        ax1.set_xlabel('')
+        ax1.set_xlim(-5,5)
+        ax1.set_yticks([])
 
         #axarr = f.add_subplot(2, 2, 2)
         ax2 = plt.subplot(gs.new_subplotspec((0, 1), colspan=5))
         #plt.plot()
-        plt.title('Intervention: Rules applied')
-        plt.ylim(0,NO_RULES)
-        plt.rc('font', size=6)
+        ax2.set_title('Intervention: Rules applied')
+        ax2.set_ylim(0,NO_RULES/3)
+        plt.rc('font', size=7)
         for i, rulestr in enumerate(testrulestrs):
-            if i+1 < NO_RULES:
-                plt.text(0,NO_RULES-(i+1),rulestr)
-        plt.xlabel('')
-        plt.xticks([])
-        plt.yticks([])
+            if i+1 < NO_RULES/3:
+                plt.text(0,NO_RULES/3-(i+1),rulestr)
+        ax2.set_xlabel('')
+        ax2.set_xticks([])
+        ax2.set_yticks([])
 
-        #axarr = f.add_subplot(2, 2, 3)
-        ax3 = plt.subplot(gs.new_subplotspec((1, 0), colspan=1))
+        ax3 = plt.subplot(gs.new_subplotspec((1, 0), colspan=1,rowspan=3))
         plt.barh(list(range(0,-len(ctrlimpacts),-1)),ctrlimpacts,color=['red' if a < 0 else 'green' for a in ctrlimpacts])
-        plt.title('Control: ' + str(round(ctrlfit,2)) + '%')
-        plt.xlabel('Rule impact (% cessation)')
-        plt.yticks([])
+        ax3.set_title('Control: ' + str(round(ctrlfit,2)) + '%')
+        ax3.set_xlabel('Rule impact (% cessation)')
+        ax3.set_yticks([])
+        ax3.set_xlim(-5,5)
 
-        #axarr = f.add_subplot(2, 2, 4)
-        ax4 = plt.subplot(gs.new_subplotspec((1, 1), colspan=5))
-        plt.title('Control: Rules applied')
-        plt.ylim(0, NO_RULES)
-        plt.rc('font', size=6)
+        ax4 = plt.subplot(gs.new_subplotspec((1, 1), colspan=5,rowspan=3))
+        ax4.set_title('Control: Rules applied')
+        ax4.set_ylim(0, NO_RULES)
+        plt.rc('font', size=7)
         for i,rulestr in enumerate(ctrlrulestrs):
             if i+1 < NO_RULES:
                 plt.text(0, NO_RULES - (i + 1), rulestr)
-        plt.xlabel('')
-        plt.xticks([])
-        plt.yticks([])
+        ax4.set_xlabel('')
+        ax4.set_xticks([])
+        ax4.set_yticks([])
 
+        #plt.subplots_adjust(left=0.12, bottom=0.08, right=0.85, top=0.92, wspace=0.01, hspace=0.08)
         f.tight_layout()
         return f
 
