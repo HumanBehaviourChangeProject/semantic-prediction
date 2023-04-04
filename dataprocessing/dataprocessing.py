@@ -101,7 +101,7 @@ def filter_pregnancy_trials(features, labels):
     pregnancy_documents = [i[0] for i in features[filter_trials].index]
     documents_to_drop = pd.Series({i:i[0] in pregnancy_documents for i in features.index})
 
-    print("Dropping the following pregnancy or relapse trials:")
+    print(f"Dropping the following {len(features[documents_to_drop].index)} pregnancy or relapse trials:")
     print("\t* " + ("\n\t* ".join({c[2] for c in features[documents_to_drop].index})))
     return features[~documents_to_drop], labels[~documents_to_drop]
 
@@ -122,6 +122,8 @@ def main():
     feature_columns = [c[0] not in (6451791, 6080518) for c in ds.columns]
     features = ds.loc[:, feature_columns]
 
+    print(f"After initial loading, dataset has {len(features.columns)} columns and {ds.shape}")
+
     female = (6080485, "Proportion identifying as female gender")
     male = (6080486, "Proportion identifying as male gender")
 
@@ -136,9 +138,15 @@ def main():
     f = Fuzzyfier()
     features, labels = f.get_extended_fuzzy_data(features, labels)
 
+    print(f"After extending, dataset has {len(features.columns)} columns and {features.shape}")
+
     features, labels = filter_pregnancy_trials(features, labels)
 
+    print(f"After filtering pregnancy trials, dataset has {len(features.columns)} columns and {features.shape}")
+
     features, labels = filter_and_cluster(features, labels)
+
+    print(f"After filtering and clustering, dataset has {len(features.columns)} columns and {features.shape}")
     write_fuzzy(features, labels)
 
 

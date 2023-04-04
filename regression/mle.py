@@ -14,7 +14,7 @@ class MLEModel(BaseModel):
         return "mle"
 
     def _train(self, train_features: np.ndarray, train_labels: np.ndarray, val_features: np.ndarray,
-              val_labels: np.ndarray, train_docs, val_docs, verbose=True):
+              val_labels: np.ndarray, train_docs, val_docs, verbose=True, weights=None, delay_val=True):
         train_filter = np.any(train_features, axis=1)
         data = train_features[train_filter]
         Q, R = linalg.qr(data)
