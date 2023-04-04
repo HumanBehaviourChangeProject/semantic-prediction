@@ -29,7 +29,7 @@ from rulenn.rule_nn import RuleNNModel
 
 ###  Server state
 
-checkpoint = 'examples/model_final.json'
+checkpoint = 'examples/model_unweighted.json'
 path = 'data/hbcp_gen.pkl'
 filters = False
 
@@ -39,6 +39,18 @@ with open(path, "rb") as fin:
 raw_features[np.isnan(raw_features)] = 0
 
 model.print_rules()
+
+
+### Plot some features of the dataset for the paper
+
+column_names = [x[1] for x in raw_features.columns]
+
+face_to_face = raw_features.iloc[:,[column_names.index("Face to face")]]
+df = pd.DataFrame("facetoface"=face_to_face.values)
+df['outcome'] = raw_labels
+df.boxplot(by=0)
+
+
 
 
 # Process results of ablation study, threshold study
