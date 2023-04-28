@@ -265,9 +265,12 @@ class RuleNNModel(BaseModel):
 
     def print_rules(self, threshold=0.2):
         names = self.model.variables + ["not " + n for n in self.model.variables]
+        count = 0
         for (row, weight) in zip(self.model.non_lin(self.model.conjunctions), self.model.rule_weights):
             if math.fabs(weight) > 1e-3:
                 print(" & ".join([n for n, v in zip(names,row) if v > threshold]) + " -> " + str(weight.item()))
+                count = count + 1
+        print(f"There are {count} rules in total.")
 
     def save(self, path:str):
         with open(os.path.join(path, "model.json"), "w") as fout:
