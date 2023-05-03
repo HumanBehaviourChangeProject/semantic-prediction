@@ -42,6 +42,7 @@ def get_data_loaders(path):
 def train(model, optimizer, train_loader, device=None):
     device = device or torch.device("cpu")
     model.train()
+    model.to(device)
     for epoch in range(EPOCH_SIZE):
         for batch_idx, (data, target) in enumerate(train_loader):
             epoch = batch_idx / len(data)
@@ -77,12 +78,11 @@ def test(model, data_loader, device=None):
 
 def build_trainer(path):
     def train_fun(config):
-        print(config)
         use_cuda = torch.cuda.is_available()
         device = torch.device("cuda" if use_cuda else "cpu")
         train_loader, test_loader, feature_names = get_data_loaders(path)
         train_featurs, train_labels = zip(*train_loader)
-        model = RuleNNModel(feature_names).prepare_model(torch.cat(train_featurs), torch.cat(train_labels), config=dict(
+        model = RuleNNModel(feature_names, device=device).prepare_model(torch.cat(train_featurs), torch.cat(train_labels), config=dict(
                 non_crips =config["non_crips"],
                 long_rules =config["long_rules"],
                 weight =config["weight"],
@@ -90,7 +90,6 @@ def build_trainer(path):
                 negative_weight =config["negative_weight"],
                 disjoint_implied = config["disjoint_implied"]
             ))
-        model.to(device)
         optimizer = optim.SGD(
             model.parameters(), lr=config["lr"], momentum=config["momentum"]
         )

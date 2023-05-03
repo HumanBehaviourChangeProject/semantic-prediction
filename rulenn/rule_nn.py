@@ -52,7 +52,6 @@ class RuleNet(nn.Module):
                 negative_weight=config.get("negative_weight", 0.1),
                 disjoint_implied=config.get("disjoint_implied",  0.5)
         )
-        print(self.penalty_weights)
         self.num_features = conj.shape[1]//2
         self.conjunctions = nn.Parameter(conj)
         self.num_rules = conj.shape[0]
@@ -162,14 +161,10 @@ def sigmoid(x):
 
 class RuleNNModel(BaseModel):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, device=None, **kwargs):
         super(RuleNNModel, self).__init__(*args, **kwargs)
         self.model = None
-        if torch.cuda.is_available():
-            self.device = "cuda:0"
-        else:
-            self.device = "cpu"
-
+        self.device = device
 
     def prepare_model(self, train_features, train_labels, config):
         num_features = train_features.shape[1]
