@@ -32,7 +32,8 @@ class Dataset(IterableDataset):
 def get_data_loaders(path):
     features, labels = _load_data(path, False, False, None)
     data = Dataset(torch.tensor(features.values), labels)
-    training_data, test_data = random_split(data, [0.8, 0.2], generator=torch.Generator().manual_seed(42))
+    train_size = int(0.8 * len(data))
+    training_data, test_data = random_split(data, [train_size, len(data) - train_size], generator=torch.Generator().manual_seed(42))
     feature_names = [b for _,b in features.columns.values]
     return DataLoader(training_data, batch_size=64, shuffle=True), DataLoader(test_data, batch_size=64, shuffle=True), feature_names
 
@@ -90,8 +91,8 @@ def build_trainer(path):
                 negative_weight =config["negative_weight"],
                 disjoint_implied = config["disjoint_implied"]
             ))
-        optimizer = optim.SGD(
-            model.parameters(), lr=config["lr"], momentum=config["momentum"]
+        optimizer = optim.Adamax(
+            model.parameters(), lr=config["lr"]
         )
 
         while True:
@@ -126,7 +127,6 @@ def run(path):
         ),
         param_space={
             "lr": tune.loguniform(1e-4, 1e-2),
-            "momentum": tune.uniform(0.1, 0.9),
             "non_crips": tune.uniform(0.1, 10),
             "long_rules": tune.uniform(0.1, 10),
             "weight": tune.uniform(0.1, 10),
