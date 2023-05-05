@@ -29,11 +29,11 @@ class Dataset(IterableDataset):
         return self.features[idx], self.labels[idx].squeeze(-1)
 
 
-def get_data_loaders(path):
+def get_data_loaders(path, seed=1):
     features, labels = _load_data(path, False, False, None)
     data = Dataset(torch.tensor(features.values), labels)
     train_size = int(0.8 * len(data))
-    training_data, test_data = random_split(data, [train_size, len(data) - train_size], generator=torch.Generator().manual_seed(42))
+    training_data, test_data = random_split(data, [train_size, len(data) - train_size], generator=torch.Generator().manual_seed(seed))
     feature_names = [b for _,b in features.columns.values]
     return DataLoader(training_data, batch_size=64, shuffle=True), DataLoader(test_data, batch_size=64, shuffle=True), feature_names
 
@@ -77,30 +77,34 @@ def test(model, data_loader, device=None):
             total += 1
     return running_loss / total
 
-def build_trainer(path):
-    def train_fun(config):
+class Trainable(tune.Trainable):
+    def __init__(self, config, *args, **kwargs):
+        super().__init__(config, *args, **kwargs)
+        self.config = config
+        self.step_count = 1
+
+    def step(self):
         use_cuda = torch.cuda.is_available()
         device = torch.device("cuda" if use_cuda else "cpu")
-        train_loader, test_loader, feature_names = get_data_loaders(path)
+        train_loader, test_loader, feature_names = get_data_loaders(self.config["path"], seed=self.step_count)
+        self.step_count += 1
         train_featurs, train_labels = zip(*train_loader)
         model = RuleNNModel(feature_names, device=device).prepare_model(torch.cat(train_featurs), torch.cat(train_labels), config=dict(
-                non_crips =config["non_crips"],
-                long_rules =config["long_rules"],
-                weight =config["weight"],
-                contradiction =config["contradiction"],
-                negative_weight =config["negative_weight"],
-                disjoint_implied = config["disjoint_implied"]
+                non_crips =self.config["non_crips"],
+                long_rules =self.config["long_rules"],
+                weight =self.config["weight"],
+                contradiction =self.config["contradiction"],
+                negative_weight =self.config["negative_weight"],
+                disjoint_implied = self.config["disjoint_implied"]
             ))
         optimizer = optim.Adamax(
-            model.parameters(), lr=config["lr"]
+            model.parameters(), lr=self.config["lr"]
         )
 
-        while True:
-            train(model, optimizer, train_loader, device)
-            acc = test(model, test_loader, device)
-            # Report metrics (and possibly a checkpoint) to Tune
-            session.report({"loss": acc})
-    return train_fun
+        train(model, optimizer, train_loader, device)
+        acc = test(model, test_loader, device)
+        # Report metrics (and possibly a checkpoint) to Tune
+        return {"loss": acc}
 
 def run(path):
     ray.init()
@@ -112,7 +116,7 @@ def run(path):
 
     resources_per_trial = {"cpu": 1}  # set this for GPUs
     tuner = tune.Tuner(
-        tune.with_resources(build_trainer(path), resources=resources_per_trial),
+        Trainable,
         tune_config=tune.TuneConfig(
             metric="loss",
             mode="min",
@@ -122,10 +126,11 @@ def run(path):
         run_config=air.RunConfig(
             name="exp",
             stop={
-                "training_iteration": 10,
+                "training_iteration": 100,
             },
         ),
         param_space={
+            "path": path,
             "lr": tune.loguniform(1e-4, 1e-2),
             "non_crips": tune.uniform(0.1, 10),
             "long_rules": tune.uniform(0.1, 10),
