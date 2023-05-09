@@ -82,6 +82,7 @@ class Trainable(tune.Trainable):
         super().__init__(config, *args, **kwargs)
         self.config = config
         self.step_count = 1
+        self.history = []
 
     def step(self):
         use_cuda = torch.cuda.is_available()
@@ -103,8 +104,9 @@ class Trainable(tune.Trainable):
 
         train(model, optimizer, train_loader, device)
         acc = test(model, test_loader, device)
+        self.history.append(acc)
         # Report metrics (and possibly a checkpoint) to Tune
-        return {"loss": acc}
+        return {"loss": sum(self.history)/len(self.history)}
 
 def run(path):
     ray.init()
