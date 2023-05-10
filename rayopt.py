@@ -108,6 +108,9 @@ class Trainable(tune.Trainable):
         # Report metrics (and possibly a checkpoint) to Tune
         return {"loss": sum(self.history)/len(self.history)}
 
+    def save_checkpoint(self, checkpoint_dir: str):
+        pass
+
 def run(path):
     ray.init()
 
