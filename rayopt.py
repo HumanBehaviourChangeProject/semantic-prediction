@@ -118,7 +118,7 @@ def run(path):
 
     # for early stopping
     sched = AsyncHyperBandScheduler()
-
+    ranges = [4*i for i in range(0,3)]
     resources_per_trial = {"cpu": 1}  # set this for GPUs
     tuner = tune.Tuner(
         Trainable,
@@ -137,12 +137,12 @@ def run(path):
         param_space={
             "path": path,
             "lr": 5e-4,
-            "non_crips": tune.grid_search(4*list(range(0,3))),
-            "long_rules": tune.grid_search(4*list(range(0,3))),
-            "weight": tune.grid_search(4*list(range(0,3))),
-            "contradiction": tune.grid_search(4*list(range(0,3))),
-            "negative_weight": tune.grid_search(4*list(range(0,3))),
-            "disjoint_implied": tune.grid_search(4*list(range(0,3))),
+            "non_crips": tune.grid_search(ranges),
+            "long_rules": tune.grid_search(ranges),
+            "weight": tune.grid_search(ranges),
+            "contradiction": tune.grid_search(ranges),
+            "negative_weight": tune.grid_search(ranges),
+            "disjoint_implied": tune.grid_search(ranges),
         },
     )
     results = tuner.fit()
