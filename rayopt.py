@@ -126,7 +126,7 @@ def run(path):
             metric="loss",
             mode="min",
             # scheduler=sched,
-            num_samples=100,
+            num_samples=1,
         ),
         run_config=air.RunConfig(
             name="exp",
@@ -136,13 +136,13 @@ def run(path):
         ),
         param_space={
             "path": path,
-            "lr": tune.loguniform(1e-4, 1e-2),
-            "non_crips": tune.uniform(0.1, 10),
-            "long_rules": tune.uniform(0.1, 10),
-            "weight": tune.uniform(0.1, 10),
-            "contradiction": tune.uniform(0.1, 10),
-            "negative_weight": tune.uniform(0.1, 10),
-            "disjoint_implied": tune.uniform(0.1, 10)
+            "lr": 5e-4,
+            "non_crips": tune.grid_search(4*list(range(0,3))),
+            "long_rules": tune.uniform(4*list(range(0,3))),
+            "weight": tune.uniform(4*list(range(0,3))),
+            "contradiction": tune.uniform(4*list(range(0,3))),
+            "negative_weight": tune.uniform(4*list(range(0,3))),
+            "disjoint_implied": tune.uniform(4*list(range(0,3)))
         },
     )
     results = tuner.fit()
