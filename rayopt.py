@@ -138,11 +138,11 @@ def run(path):
             "path": path,
             "lr": 5e-4,
             "non_crips": tune.grid_search(4*list(range(0,3))),
-            "long_rules": tune.uniform(4*list(range(0,3))),
-            "weight": tune.uniform(4*list(range(0,3))),
-            "contradiction": tune.uniform(4*list(range(0,3))),
-            "negative_weight": tune.uniform(4*list(range(0,3))),
-            "disjoint_implied": tune.uniform(4*list(range(0,3)))
+            "long_rules": tune.grid_search(4*list(range(0,3))),
+            "weight": tune.grid_search(4*list(range(0,3))),
+            "contradiction": tune.grid_search(4*list(range(0,3))),
+            "negative_weight": tune.grid_search(4*list(range(0,3))),
+            "disjoint_implied": tune.grid_search(4*list(range(0,3))),
         },
     )
     results = tuner.fit()
