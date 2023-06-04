@@ -73,7 +73,7 @@ outcome = featuresemantics.query('group == "outcome"')['featurename'].values.tol
 outcome = [x for x in outcome if x in featurenames]
 
 app_ui = ui.page_fluid(
-    ui.panel_title(ui.img(src="logo.png"),
+    ui.panel_title(ui.img(src="logo.png",style="width: 100px"),
                    ui.h2("Smoking Cessation")),
 
     ui.layout_sidebar(ui.panel_sidebar(
