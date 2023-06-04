@@ -2,6 +2,7 @@ import inspect
 import pathlib
 import pickle
 import sys
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -66,7 +67,8 @@ outcome = featuresemantics.query('group == "outcome"')['featurename'].values.tol
 outcome = [x for x in outcome if x in featurenames]
 
 app_ui = ui.page_fluid(
-    ui.panel_title(ui.h2("HBCP predictions (prototype): Smoking Cessation")),
+    ui.panel_title(ui.img(src="www/prediction tool hbcp final copy@2x copy.png"),
+                   ui.h2("Smoking Cessation")),
 
     ui.layout_sidebar(ui.panel_sidebar(
         ui.input_checkbox_group('intervention',
@@ -261,4 +263,6 @@ def server(input, output, session):
 
 
 # Start the application
-app = App(app_ui, server)
+
+www_dir = Path(__file__).parent / "www"
+app = App(app_ui, server,static_assets=www_dir)
