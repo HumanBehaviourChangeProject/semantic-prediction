@@ -73,7 +73,7 @@ outcome = featuresemantics.query('group == "outcome"')['featurename'].values.tol
 outcome = [x for x in outcome if x in featurenames]
 
 app_ui = ui.page_fluid(
-    ui.panel_title(ui.img(src="www/prediction tool hbcp final copy@2x copy.png"),
+    ui.panel_title(ui.img(src="logo.png"),
                    ui.h2("Smoking Cessation")),
 
     ui.layout_sidebar(ui.panel_sidebar(
@@ -270,5 +270,6 @@ def server(input, output, session):
 
 # Start the application
 
-www_dir = pathlib.Path(__file__).parent / "www"
+www_dir = pathlib.Path(__file__).parent
+print("Loading images from",www_dir)
 app = App(app_ui, server,static_assets=www_dir)
