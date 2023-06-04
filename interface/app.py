@@ -136,7 +136,7 @@ app_ui = ui.page_fluid(
                                            "Follow up (weeks)",
                                            4, #min(df.clean$Combined.follow.up),
                                            60,   #as.integer(max(df.clean$Combined.follow.up)),
-                                           24     #default value (6 months)
+                                           26     #default value (6 months)
                                        ),
                                        )
                       ),
