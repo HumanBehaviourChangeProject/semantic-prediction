@@ -120,6 +120,40 @@ class BaseReader(ABC):
 class AttributeReader(BaseReader):
     def read(self, *args) -> pd.DataFrame:
         doc_attrs, attribute_names = self._read()
+
+        ### TRY PRINT CONTEXTS
+        ##print("Try print contexts")
+
+        ##bct_contexts = {attribute_names[i]: dict() for i in attribute_names}
+
+        ##for doc, arms in sorted(doc_attrs.items()):
+        ##    # if len(arms) > 1:
+        ##    #    worksheet.merge_range(f'A{row_counter+1}:A{row_counter + len(arms)}', doc)
+        ##    # else:
+        ##    #    worksheet.write(row_counter, 0, doc)
+        ##    for arm, arm_attributes in arms.items():
+        ##        doc_name, doc_id = doc.split("___")
+        ##        arm_name, arm_id = arm.split("___")
+        ##        for aid in attribute_names:
+        ##            try:
+        ##                values = arm_attributes[aid]
+        ##            except KeyError:
+        ##                pass
+        ##            else:
+        ##                bct_contexts[attribute_names[aid]][
+        ##                    (doc_name, doc_id, arm_name, arm_id)
+        ##                ] = [context for (_, context) in values]
+
+        ##with open("contexts.csv", "wt") as fout:
+        ##    w = csv.writer(fout)
+        ##    for attr, doc_con in bct_contexts.items():
+        ##        w.writerow([attr])
+        ##        for (doc, doc_id, arm_name, arm_id), contexts in doc_con.items():
+        ##            w.writerow([attr, doc, doc_id, arm_name, arm_id] + contexts)
+
+        ##print("Finish trying to print contexts")
+        ## FINISH TRY PRINT CONTEXTS
+
         differ = Differ()
         dropper = Dropper()
         d = {

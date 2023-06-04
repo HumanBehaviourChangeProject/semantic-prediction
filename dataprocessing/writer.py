@@ -21,7 +21,7 @@ def write_fuzzy(features, labels):
         full_frame.to_csv(fout)
 
 
-def write_bct_contexts(attributes, cleaned, doc_attrs, doc_name_map, arm_name_map):
+def write_bct_contexts(ds,doc_attrs):
     bcts = (
         6452745,
         6452746,

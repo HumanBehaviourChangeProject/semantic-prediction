@@ -10,7 +10,7 @@ from skfuzzy import cluster as fc
 import numpy as np
 import re
 from fuzzysets import FUZZY_SETS
-from writer import write_csv, write_fuzzy
+from writer import write_csv, write_fuzzy, write_bct_contexts
 from cleaner import is_number
 from reader import AttributeReader
 from abc import ABC, abstractmethod
@@ -109,6 +109,7 @@ def filter_pregnancy_trials(features, labels):
 def main():
     reader = AttributeReader()
     ds = reader.read()
+
     print("Build fuzzy dataset")
 
     ds[ds.isna()] = None
@@ -148,6 +149,8 @@ def main():
 
     print(f"After filtering and clustering, dataset has {len(features.columns)} columns and {features.shape}")
     write_fuzzy(features, labels)
+
+
 
 
 if __name__ == "__main__":
