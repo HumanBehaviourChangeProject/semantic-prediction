@@ -2,11 +2,6 @@ import inspect
 import pathlib
 import pickle
 import sys
-from pathlib import Path
-
-logfile = open('shinyserver.log', 'a', 1)
-sys.stdout = logfile
-sys.stderr = logfile
 
 import numpy as np
 import pandas as pd
