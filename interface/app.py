@@ -101,7 +101,7 @@ app_ui = ui.page_fluid(
                                                        "Mean age",
                                                        15, # min (mean age)
                                                        80, # max (mean age)
-                                                       25  # mean (age)
+                                                       50  # default value
                                                        ),
                                        ui.input_slider("proportionfemale",
                                                        "Proportion female",
@@ -136,7 +136,7 @@ app_ui = ui.page_fluid(
                                            "Follow up (weeks)",
                                            4, #min(df.clean$Combined.follow.up),
                                            60,   #as.integer(max(df.clean$Combined.follow.up)),
-                                           12     #median(df.clean$Combined.follow.up)
+                                           24     #default value (6 months)
                                        ),
                                        )
                       ),
