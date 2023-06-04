@@ -2,6 +2,7 @@ import inspect
 import pathlib
 import pickle
 import sys
+import os
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,12 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 ### Handle local imports
+
+
+### Handle local imports
+os.chdir('/var/www/html/semantic-prediction')
+sys.path.append('/var/www/html/semantic-prediction')
+
 
 src_file_path = inspect.getfile(lambda: None)
 
