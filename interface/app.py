@@ -270,5 +270,5 @@ def server(input, output, session):
 
 # Start the application
 
-www_dir = Path(__file__).parent / "www"
+www_dir = pathlib.Path(__file__).parent / "www"
 app = App(app_ui, server,static_assets=www_dir)
