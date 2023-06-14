@@ -2,7 +2,7 @@ import inspect
 import pathlib
 import pickle
 import sys
-from pathlib import Path
+import os
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,12 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
 ### Handle local imports
+
+
+### Handle local imports
+os.chdir('/var/www/html/semantic-prediction')
+sys.path.append('/var/www/html/semantic-prediction')
+
 
 src_file_path = inspect.getfile(lambda: None)
 
@@ -67,8 +73,7 @@ outcome = featuresemantics.query('group == "outcome"')['featurename'].values.tol
 outcome = [x for x in outcome if x in featurenames]
 
 app_ui = ui.page_fluid(
-    ui.panel_title(ui.img(src="www/prediction tool hbcp final copy@2x copy.png"),
-                   ui.h2("Smoking Cessation")),
+    ui.panel_title(ui.h2(ui.img(src="logo.png",style="width: 400px"),"Smoking Cessation")),
 
     ui.layout_sidebar(ui.panel_sidebar(
         ui.input_checkbox_group('intervention',
@@ -96,7 +101,7 @@ app_ui = ui.page_fluid(
                                                        "Mean age",
                                                        15, # min (mean age)
                                                        80, # max (mean age)
-                                                       25  # mean (age)
+                                                       50  # default value
                                                        ),
                                        ui.input_slider("proportionfemale",
                                                        "Proportion female",
@@ -131,7 +136,7 @@ app_ui = ui.page_fluid(
                                            "Follow up (weeks)",
                                            4, #min(df.clean$Combined.follow.up),
                                            60,   #as.integer(max(df.clean$Combined.follow.up)),
-                                           12     #median(df.clean$Combined.follow.up)
+                                           26     #default value (6 months)
                                        ),
                                        )
                       ),
@@ -263,6 +268,6 @@ def server(input, output, session):
 
 
 # Start the application
-
-www_dir = Path(__file__).parent / "www"
+www_dir = pathlib.Path(__file__).parent
+print("Loading images from",www_dir)
 app = App(app_ui, server,static_assets=www_dir)
