@@ -5,7 +5,7 @@ from matplotlib import pyplot as plt
 from math import fabs
 buckets = []
 
-folder = "results/runs/5-final"
+folder = "results/runs/test"
 
 with open(f"{folder}/random_forest/crossval.txt", "r") as fin:
     buckets.append(("random forest", [float(l) for l in fin]))
@@ -34,6 +34,24 @@ for modelname in df['model'].unique():
 
 
 
+# Do several runs in order to estimate the variability of the MAE in cross-validation
+meanabserrors1 = meanabserrors
+meanabserrors2 = meanabserrors
+meanabserrors3 = meanabserrors
+meanabserrors4 = meanabserrors
+meanabserrors5 = meanabserrors
+
+crossvals = [meanabserrors1,meanabserrors2,meanabserrors3,meanabserrors4,meanabserrors5]
+
+dfcrossvals = pd.DataFrame({"Grand Mean":[9.98,9.98,9.98,9.98,9.98],
+                            "Random Forest": [x['random forest'] for x in crossvals],
+                            "Mixed Effect Linear": [x["mixed-effect"] for x in crossvals],
+                            "Deep Neural Network": [x["deep"] for x in crossvals],
+                            "Ontology-informed Rules": [x["rule"] for x in crossvals]})
+seaborn.stripplot(data=dfcrossvals)
+
+plt.close()
+plt.figure()
 
 ### Get the grand mean of the dataset as an additional comparison
 import inspect
@@ -56,6 +74,17 @@ filters = False
 with open(path, "rb") as fin:
     raw_features, raw_labels = pickle.load(fin)
 raw_features[np.isnan(raw_features)] = 0
+
+#### Get the information about the final dataset for the paper
+
+documents = [i[2] for i in raw_features.index]
+unique_documents = len(set(documents))
+
+featurenames = [x[1] for x in raw_features.columns]
+print("We have ",len(featurenames)," features.")
+print(featurenames)
+nonexpandedfeatures = [f for f in featurenames if "<=" not in f]
+nonexpandedfeaturescount = len(nonexpandedfeatures)-3 # for age
 
 model = RuleNNModel.load(checkpoint)
 

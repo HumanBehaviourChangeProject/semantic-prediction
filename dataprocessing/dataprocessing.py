@@ -75,7 +75,7 @@ def filter_and_cluster(features, labels):
     for f in clusters:
         features[(f,f)] = features[[*cluster_mappings[f]]].any(axis=1)
 
-    threshold = 30
+    threshold = 19
 
     feature_filter = features.sum(axis=0) > threshold
     sufficiently_represented_features = features.columns[feature_filter]
@@ -146,6 +146,10 @@ def main():
     print(f"After filtering pregnancy trials, dataset has {len(features.columns)} columns and {features.shape}")
 
     features, labels = filter_and_cluster(features, labels)
+
+    #print("Labels before log transformation: ",labels)
+    #labels = np.log2(labels+1)
+    #print("Labels after log transformation: ", labels)
 
     print(f"After filtering and clustering, dataset has {len(features.columns)} columns and {features.shape}")
     write_fuzzy(features, labels)

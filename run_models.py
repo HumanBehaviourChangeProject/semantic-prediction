@@ -85,6 +85,7 @@ def _cross(path, out, filters, select, no_test, weighted, drop_feature, **kwargs
         models_to_run = model_classes
 
     variables = [x[1] for x in features.columns]
+    #print("Got variables: ",variables)
     cross_val(
         models_to_run,
         features,

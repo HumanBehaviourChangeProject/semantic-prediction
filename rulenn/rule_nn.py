@@ -20,6 +20,7 @@ class RuleNet(nn.Module):
         super().__init__()
         self.device = device
         self.variables = names
+        #print("Using variable names: ",self.variables)
         if config is None:
             conj = 3 - 6 * torch.rand(
                 (num_conjunctions, 2 * num_variables), requires_grad=not fix_conjunctions, device=device
@@ -169,7 +170,7 @@ class RuleNNModel(BaseModel):
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
         optimizer = optim.Adam(net.parameters(), lr=1e-3)
-        keep_top = 5
+        keep_top = 3   # was 5
         no_improvement = 0
         best = []
         j = 0

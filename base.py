@@ -95,6 +95,8 @@ def _load_data(path, filters, weighted=False, drop=None):
     with open(path, "rb") as fin:
         features, labels = pickle.load(fin)
 
+    #print("Variables loaded", [x[1] for x in features.columns])
+
     features[np.isnan(features)] = 0
     if weighted:
         copy_features = pd.DataFrame()
@@ -105,10 +107,12 @@ def _load_data(path, filters, weighted=False, drop=None):
             features = pd.DataFrame(y for x in [[features.loc[key]]*value for key, value in weights] for y in x)
             labels = np.array([y for x in [[labels[i]] * value for i, (key, value) in enumerate(weights)] for y in x])
 
-    if filters is not None:
+    if filters is not None and filters:  # Was filtering even if filters==False
+        print("Filtering features",filters)
         features = filter_features(features)
 
     if drop is not None:
+        print("Dropping features",drop)
         col = features.columns[int(drop)]
         print("Exclude column:", col)
         features.drop(columns=[col], inplace=True)
