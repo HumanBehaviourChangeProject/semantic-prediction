@@ -3,46 +3,48 @@ from seaborn import boxplot, kdeplot, barplot
 import pandas as pd
 from matplotlib import pyplot as plt
 from math import fabs
-buckets = []
-
-folder = "results/runs/test"
-
-with open(f"{folder}/random_forest/crossval.txt", "r") as fin:
-    buckets.append(("random forest", [float(l) for l in fin]))
-
-with open(f"{folder}/rulenn/crossval.txt", "r") as fin:
-    buckets.append(("rule", [float(l) for l in fin]))
-
-with open(f"{folder}/mle/crossval.txt", "r") as fin:
-    buckets.append(("mixed-effect", [-float(l) for l in fin]))
-
-with open(f"{folder}/deep/crossval.txt", "r") as fin:
-    buckets.append(("deep", [float(l) for l in fin]))
-
-df = pd.DataFrame([{"model":n,"error":v} for n, l in buckets for v in l])
-df['abserror'] = df['error'].abs()
-
-#boxplot(x=[name for name, l in buckets for _ in l],y=[abs(x) for _, l in buckets for x in l], showfliers=False)
+import os
+import subprocess
 
 
-df['model'].unique()
+### Execute the cross-validation multiple times and store the results
+crossvals = []
+for i in range(5):
+    # Execute the cross-validation
+    command = "cd /Users/hastingj/Work/Python/semantic-prediction; source sempred/bin/activate; rm -R results/runs/test/*; python run_models.py cross --out results/runs/test ./data/hbcp_gen.pkl "
+    process = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+    process.wait()
 
-meanabserrors = {}
+    buckets = []
 
-for modelname in df['model'].unique():
-    meanabserrors[modelname] = df.query(f"model=='{modelname}'")['error'].abs().mean()
+    folder = "results/runs/test"
 
+    with open(f"{folder}/random_forest/crossval.txt", "r") as fin:
+        buckets.append(("random forest", [float(l) for l in fin]))
 
+    with open(f"{folder}/rulenn/crossval.txt", "r") as fin:
+        buckets.append(("rule", [float(l) for l in fin]))
 
-# Do several runs in order to estimate the variability of the MAE in cross-validation
-meanabserrors1 = meanabserrors
-meanabserrors2 = meanabserrors
-meanabserrors3 = meanabserrors
-meanabserrors4 = meanabserrors
-meanabserrors5 = meanabserrors
+    with open(f"{folder}/mle/crossval.txt", "r") as fin:
+        buckets.append(("mixed-effect", [-float(l) for l in fin]))
 
-crossvals = [meanabserrors1,meanabserrors2,meanabserrors3,meanabserrors4,meanabserrors5]
+    with open(f"{folder}/deep/crossval.txt", "r") as fin:
+        buckets.append(("deep", [float(l) for l in fin]))
 
+    df = pd.DataFrame([{"model":n,"error":v} for n, l in buckets for v in l])
+    df['abserror'] = df['error'].abs()
+
+    meanabserrors = {}
+
+    for modelname in df['model'].unique():
+        meanabserrors[modelname] = df.query(f"model=='{modelname}'")['error'].abs().mean()
+
+    crossvals.append(meanabserrors)
+
+print("DONE")
+# END EXECUTE CROSS VALIDATION MULTIPLE TIMES
+
+## Add the grand mean of the dataset and setup dataframe for plotting
 dfcrossvals = pd.DataFrame({"Grand Mean":[9.98,9.98,9.98,9.98,9.98],
                             "Random Forest": [x['random forest'] for x in crossvals],
                             "Mixed Effect Linear": [x["mixed-effect"] for x in crossvals],

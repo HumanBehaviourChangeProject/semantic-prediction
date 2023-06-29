@@ -1,8 +1,10 @@
 import random
+import sys
 
 import tqdm
 from torch import nn
 import torch
+from torch.nn import functional as nnf
 import torch.optim as optim
 import copy
 import numpy as np
@@ -15,38 +17,54 @@ import json
 
 class RuleNet(nn.Module):
     def __init__(
-        self, num_variables, num_conjunctions, names, config=None, append=None, device="cpu", fix_conjunctions=False
+        self, config
     ):
         super().__init__()
-        self.device = device
-        self.variables = names
-        #print("Using variable names: ",self.variables)
-        if config is None:
+        self.device =  config.get("device", "cpu")
+        self.variables = config["names"]
+        preset = config.get("preset")
+        if preset is None:
+            num_variables = config["num_features"]
+            num_conjunctions = config["num_conjunctions"]
+            base = config.get("base")
+            append = config.get("append")
+            fix_conjunctions = config.get("fix_conjunctions", False)
             conj = 3 - 6 * torch.rand(
-                (num_conjunctions, 2 * num_variables), requires_grad=not fix_conjunctions, device=device
+                (num_conjunctions, 2 * num_variables), requires_grad=not fix_conjunctions, device=self.device
             )
-            rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True, device=device)
-            base = 10 + 6 * torch.rand(1, requires_grad=True, device=device)
+            rw = 10 - 20 * torch.rand((num_conjunctions,), requires_grad=True, device=self.device)
+            if base is None:
+                base = 10 + 6 * torch.rand(1, requires_grad=True, device=self.device)
+            else:
+                base = torch.tensor(base)
             if append is not None:
                 conj = torch.cat((conj, append[0]))
                 rw = torch.cat((rw, append[1]))
         else:
-            conj = config["conjunctions"]
-            rw = config["rule_weights"]
-            base = config["base"]
+            conj = preset["conjunctions"]
+            rw = preset["rule_weights"]
+            base = preset["base"]
+        self.penalty_weights = dict(
+                non_crips=config.get("non_crips",1),
+                long_rules=config.get("long_rules", 1),
+                weight=config.get("weight", 0.1),
+                contradiction=config.get("contradiction", 0.5),
+                negative_weight=config.get("negative_weight", 0.1),
+                disjoint_implied=config.get("disjoint_implied",  0.5)
+        )
         self.num_features = conj.shape[1]//2
         self.conjunctions = nn.Parameter(conj)
         self.num_rules = conj.shape[0]
         self.rule_weights = nn.Parameter(rw)
-        self.base = 10 #nn.Parameter(base)
+        self.base = nn.Parameter(base)
         self.non_lin = nn.Sigmoid()
         self.dropout = nn.Dropout(0.1)
 
         self.implication_filter = self.load_implication_filters()
         self.disjoint_filter = self.load_disjoint_filters()
 
-        d = torch.diag(torch.ones((len(names),), requires_grad=False, device=device))
-        z = torch.zeros(len(names), len(names), requires_grad=False, device=device)
+        d = torch.diag(torch.ones((len(self.variables),), requires_grad=False, device=self.device))
+        z = torch.zeros(len(self.variables), len(self.variables), requires_grad=False, device=self.device)
         self.pos = torch.cat([d, z])
         self.neg = torch.cat([z, d])
 
@@ -77,27 +95,27 @@ class RuleNet(nn.Module):
 
         m = torch.relu(torch.sum(w, dim=-1) - 3)#, torch.zeros(w.shape[:-1], device=self.device))
 
-        long_rules_penalty = (1-scale)*torch.sum(m) # penalty for long rules
+        long_rules_penalty = torch.sqrt((1-scale)*torch.sum(m)) # penalty for long rules
 
-        contradiction_penalty = 0.5 * torch.sum(
+        contradiction_penalty = torch.sum(
             self.tnorm(w[:,:self.num_features] * w[:,self.num_features:] , dim=-1), dim=-1
         )
 
-        disjoint_implied_penalty = 0.5 * torch.sum(
+        disjoint_implied_penalty = torch.sum(
             torch.sum(self.calculate_pure_fit(w, self.disjoint_filter + self.implication_filter), dim=-1), dim=-1
         )
 
-        weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.abs(self.rule_weights)))
+        weight_penalty = torch.sqrt(torch.sum(torch.abs(self.rule_weights)))
 
-        negative_weight_penalty = 0.1 * torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
+        negative_weight_penalty = torch.sqrt(torch.sum(torch.relu(-self.rule_weights)))
 
         penalties = scale * (
-                non_crips_penalty
-                + long_rules_penalty
-                + weight_penalty
-                + contradiction_penalty
-                + negative_weight_penalty
-                + disjoint_implied_penalty
+                self.penalty_weights["non_crips"] * non_crips_penalty
+                + self.penalty_weights["long_rules"] * long_rules_penalty
+                + self.penalty_weights["weight"] * weight_penalty
+                + self.penalty_weights["contradiction"] * contradiction_penalty
+                + self.penalty_weights["negative_weight"] * negative_weight_penalty
+                + self.penalty_weights["disjoint_implied"] * disjoint_implied_penalty
         )
 
         return penalties
@@ -143,34 +161,41 @@ def sigmoid(x):
 
 class RuleNNModel(BaseModel):
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, device=None, **kwargs):
         super(RuleNNModel, self).__init__(*args, **kwargs)
         self.model = None
-        if torch.cuda.is_available():
-            self.device = "cuda:0"
-        else:
-            self.device = "cpu"
+        self.device = device
+        self.config = {"non_crips": 0,"long_rules": 0, "weight": 0, "contradiction": 0, "negative_weight": 0, "disjoint_implied" : 0, "lr": 5e-4 }
 
-    def _train(self, train_features, train_labels, val_features, val_labels, variables, *args, verbose=True, weights=None, delay_val=True):
-
-
+    def prepare_model(self, train_features, train_labels):
+        config  = self.config
         num_features = train_features.shape[1]
-
+        x = torch.cat(
+            (train_features.cpu(), torch.ones(train_features.shape[0], 1)),
+            dim=-1)
         if self.model is None:
             pre = torch.tensor(
-                np.linalg.lstsq((train_features.cpu() + 1e-5*torch.rand(train_features.shape)).cpu().numpy(), train_labels.cpu(), rcond=None)[0],
+                np.linalg.lstsq(x.cpu().numpy(), train_labels.cpu(), rcond=None)[0],
                 requires_grad=True, device=self.device
             )
-            presence_filter = torch.abs(pre) < 50
+            presence_filter = (torch.abs(pre[:-1]) < 50).squeeze(-1)
             conjs = (torch.diag(10 * torch.ones(num_features, requires_grad=True, device=self.device)) + 1 - 2*torch.rand(num_features,num_features, device=self.device))[presence_filter]
             conjs = torch.cat((conjs, 3-10*torch.rand(conjs.shape, device=self.device)), dim=-1)
-            net = RuleNet(num_features, 200-conjs.shape[0], self.variables, append=(conjs, pre[presence_filter]), device=self.device)
+            net = RuleNet(dict(num_features=num_features, num_conjunctions=200-conjs.shape[0], names=self.variables, append=(conjs, pre[:-1][presence_filter].squeeze(-1)), device=self.device, base=pre[-1], **config))
         else:
             net = self.model
+
+        return net
+
+
+    def _train(self, train_features, train_labels, val_features, val_labels, train_docs, val_docs, verbose=True, weights=None, delay_val=True):
+        config = self.config
+        net = self.prepare_model(train_features, train_labels)
+
         criterion = nn.MSELoss()
         val_criterion = nn.L1Loss()
-        optimizer = optim.Adam(net.parameters(), lr=1e-3)
-        keep_top = 3   # was 5
+        optimizer = optim.Adamax(net.parameters(), lr=config["lr"])
+        keep_top = 5
         no_improvement = 0
         best = []
         j = 0
@@ -186,7 +211,7 @@ class RuleNNModel(BaseModel):
             # forward + backward + optimize
 
             e = sigmoid(-3+6*epoch/(max_epoch)) if epoch > max_epoch/4 else 0
-            batch_size = 100
+            batch_size = 10
             random.shuffle((train_index))
             net.train()
             for i in list(range(0, len(train_index), batch_size)):
@@ -197,7 +222,10 @@ class RuleNNModel(BaseModel):
                 optimizer.zero_grad()
                 outputs = net(train_features[batch_index])
                 base_loss = criterion(outputs, batch_labels)
-                penalties = net.calculate_penalties(e)
+                if e > 0:
+                    penalties = net.calculate_penalties(e*0.1)
+                else:
+                    penalties = torch.tensor(0)
                 loss = base_loss + penalties
                 loss.backward()
                 optimizer.step()
@@ -266,12 +294,9 @@ class RuleNNModel(BaseModel):
 
     def print_rules(self, threshold=0.2):
         names = self.model.variables + ["not " + n for n in self.model.variables]
-        count = 0
         for (row, weight) in zip(self.model.non_lin(self.model.conjunctions), self.model.rule_weights):
             if math.fabs(weight) > 1e-3:
                 print(" & ".join([n for n, v in zip(names,row) if v > threshold]) + " -> " + str(weight.item()))
-                count = count + 1
-        print(f"There are {count} rules in total.")
 
     def save(self, path:str):
         with open(os.path.join(path, "model.json"), "w") as fout:
@@ -289,7 +314,13 @@ class RuleNNModel(BaseModel):
         with open(os.path.join(path), "r") as fin:
             d = json.load(fin)
             x = cls(d["variables"])
-            x.model = RuleNet(None, None, [v for v in d["variables"] if not v.startswith("not ")], config=dict(conjunctions=torch.tensor(d["conjunctions"], requires_grad=not fix_conjunctions, dtype=torch.float),
-                                                  rule_weights=torch.tensor(d["weights"], dtype=torch.float),
-                                                  base=torch.tensor(d["base"], dtype=torch.float)), fix_conjunctions=fix_conjunctions)
+            x.model = RuleNet(None, None, [v for v in d["variables"] if not v.startswith("not ")], preset=dict(conjunctions=torch.tensor(d["conjunctions"], requires_grad=not fix_conjunctions, dtype=torch.float),
+                                                                                                               rule_weights=torch.tensor(d["weights"], dtype=torch.float),
+                                                                                                               base=torch.tensor(d["base"], dtype=torch.float)), fix_conjunctions=fix_conjunctions)
             return x
+
+
+
+
+
+
