@@ -73,7 +73,12 @@ outcome = featuresemantics.query('group == "outcome"')['featurename'].values.tol
 outcome = [x for x in outcome if x in featurenames]
 
 app_ui = ui.page_fluid(
-    ui.panel_title(ui.h2(ui.img(src="logo.png",style="width: 400px"),"Smoking Cessation")),
+    ui.panel_title(ui.div(
+        ui.img(src="logo.png",style="width: 400px"),
+        ui.h2("Smoking Cessation"),
+        ui.span(style="flex: 1"),
+        ui.a("Contact", href="https://bciovis.hbcptools.org/contact"),
+        style="display: flex; align-items: center; margin-right: 14px;")),
 
     ui.layout_sidebar(ui.panel_sidebar(
         ui.input_checkbox_group('intervention',
