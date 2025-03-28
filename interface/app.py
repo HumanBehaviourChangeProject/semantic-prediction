@@ -44,7 +44,7 @@ model = RuleNNModel.load(checkpoint)
 model.model.eval()  # Run in production mode
 
 with open(path, "rb") as fin:
-    raw_features, raw_labels = pickle.load(fin)
+    raw_features, raw_labels = pd.read_pickle(fin)
 raw_features[np.isnan(raw_features)] = 0
 
 if filters:
@@ -80,7 +80,7 @@ app_ui = ui.page_fluid(
         ui.a("Contact", href="https://bciovis.hbcptools.org/contact"),
         style="display: flex; align-items: center; margin-right: 14px;")),
 
-    ui.layout_sidebar(ui.panel_sidebar(
+    ui.layout_sidebar(ui.sidebar(
         ui.input_checkbox_group('intervention',
                                 'Intervention',
                                 intervention),
@@ -99,56 +99,54 @@ app_ui = ui.page_fluid(
                                                     selected="placebo"
                                                     )
                              ),
+        ),
+        ui.row(
+            ui.column(4,
+                   ui.input_slider("meanage",
+                                   "Mean age",
+                                   15, # min (mean age)
+                                   80, # max (mean age)
+                                   50  # default value
+                                   ),
+                   ui.input_slider("proportionfemale",
+                                   "Proportion female",
+                                   0,
+                                   100,
+                                   50  # mean (proportion female)
+                                   )
+                   ),
+            ui.column(4,
+                   ui.input_slider("meantobacco",
+                                   "Mean number of times tobacco used",
+                                   1, # min (mean number of times tobacco used)
+                                   30,
+                                   10 # median(df.clean$Mean.number.of.times.tobacco.used)
+                                   ),
+                   ui.input_checkbox("patientrole",
+                                     "Patient role?"
+                                    )
+                   ),
+            ui.column(4,
+                   ui.input_radio_buttons(
+                       "outcome",
+                       "Outcome",
+                       choices=outcome
+                   ),
+                   ui.input_checkbox(
+                       "verification",
+                       "Biochemical verification"
+                   ),
+                   ui.input_slider(
+                       "followup",
+                       "Follow up (weeks)",
+                       4, #min(df.clean$Combined.follow.up),
+                       60,   #as.integer(max(df.clean$Combined.follow.up)),
+                       26     #default value (6 months)
+                   ),
+                   )
+            ),
+        ui.row( ui.column(12,ui.output_plot("predict") ) )
     ),
-        ui.panel_main(ui.row(
-                             ui.column(4,
-                                       ui.input_slider("meanage",
-                                                       "Mean age",
-                                                       15, # min (mean age)
-                                                       80, # max (mean age)
-                                                       50  # default value
-                                                       ),
-                                       ui.input_slider("proportionfemale",
-                                                       "Proportion female",
-                                                       0,
-                                                       100,
-                                                       50  # mean (proportion female)
-                                                       )
-                                       ),
-                             ui.column(4,
-                                       ui.input_slider("meantobacco",
-                                                       "Mean number of times tobacco used",
-                                                       1, # min (mean number of times tobacco used)
-                                                       30,
-                                                       10 # median(df.clean$Mean.number.of.times.tobacco.used)
-                                                       ),
-                                       ui.input_checkbox("patientrole",
-                                                         "Patient role?"
-                                                        )
-                                       ),
-                             ui.column(4,
-                                       ui.input_radio_buttons(
-                                           "outcome",
-                                           "Outcome",
-                                           choices=outcome
-                                       ),
-                                       ui.input_checkbox(
-                                           "verification",
-                                           "Biochemical verification"
-                                       ),
-                                       ui.input_slider(
-                                           "followup",
-                                           "Follow up (weeks)",
-                                           4, #min(df.clean$Combined.follow.up),
-                                           60,   #as.integer(max(df.clean$Combined.follow.up)),
-                                           26     #default value (6 months)
-                                       ),
-                                       )
-                      ),
-            ui.row( ui.column(12,ui.output_plot("predict") ) )
-        )
-    ),
-
 )
 
 
