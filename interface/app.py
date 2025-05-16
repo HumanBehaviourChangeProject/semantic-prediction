@@ -225,17 +225,18 @@ def server(input, output, session):
 
         f = plt.figure(figsize=(30,100))
 
-        gs = GridSpec(4, 6, figure=f)
-        ax1 = plt.subplot(gs.new_subplotspec((0, 0), colspan=1))
+        gs = GridSpec(5, 6, figure=f)
+        ax1 = plt.subplot(gs.new_subplotspec((0, 0), colspan=1, rowspan=2))
         #axarr = f.add_subplot(2, 2, 1)
         plt.barh(list(range(0,-(len(testonlyimpacts)+1),-1)),testonlyimpacts+[0],color=['red' if a < 0 else 'green' for a in testonlyimpacts])
         ax1.set_title('Intervention: '+str(round(testfit,2))+'%')
         ax1.set_xlabel('')
         ax1.set_xlim(-5,5)
+        ax1.set_xticks([])
         ax1.set_yticks([])
 
         #axarr = f.add_subplot(2, 2, 2)
-        ax2 = plt.subplot(gs.new_subplotspec((0, 1), colspan=5))
+        ax2 = plt.subplot(gs.new_subplotspec((0, 1), colspan=5, rowspan=2))
         #plt.plot()
         ax2.set_title('Intervention: Rules applied')
         ax2.set_ylim(0,NO_RULES/3)
