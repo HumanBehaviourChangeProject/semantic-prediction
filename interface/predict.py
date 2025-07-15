@@ -310,8 +310,8 @@ example_input = {
     "source": []
 }
 
-example_input_instance = InputClass(example_input)
+#example_input_instance = InputClass(example_input)
 
-result = predict(example_input_instance)
+#result = predict(example_input_instance)
 
-print(result)
+#print(result)
