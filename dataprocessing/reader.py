@@ -30,7 +30,7 @@ class BaseReader(ABC):
 
         with open(
             "data/EntityMapping_27May21.csv",
-            "r",
+            "r", encoding="utf8"
         ) as fin:
             r = csv.reader(fin)
             header = next(r)
@@ -41,7 +41,7 @@ class BaseReader(ABC):
         return id_map
 
     def _read(self):
-        with open("data/trainAVs.txt", "r") as fin:
+        with open("data/trainAVs.txt", "r", encoding="utf8") as fin:
             d = json.load(fin)
 
         doc_attrs = dict()
@@ -103,12 +103,12 @@ class BaseReader(ABC):
         return doc_attrs, {k:v.strip() for k,v in attributes_raw.items()}
 
     def load_prio(self):
-        with open("data/prio.txt", "r") as fin:
+        with open("data/prio.txt", "r", encoding="utf8") as fin:
             prio_names = [l.replace("\n", "") for l in fin]
 
         with open(
             "data/All_annotations_512papers_05March20.json",
-            "r",
+            "r", encoding="utf8"
         ) as fin:
             d = json.load(fin)
             for cs in d["CodeSets"]:

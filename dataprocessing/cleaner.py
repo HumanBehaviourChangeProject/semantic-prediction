@@ -11,7 +11,7 @@ _MAPPINGS = set()
 
 class Dropper:
     def __init__(self):
-        with open("data/deleted.txt", "r") as fin:
+        with open("data/deleted.txt", "r", encoding="utf8") as fin:
             self.deleted_documents = [int(d.strip()) for d in fin]
 
     def should_be_dropped(self, doc_id):
@@ -20,7 +20,7 @@ class Dropper:
 
 class Differ:
     def __init__(self):
-        with open("data/diff.csv", "r") as fin:
+        with open("data/diff.csv", "r", encoding="utf8") as fin:
             reader = csv.reader(fin)
             self.diff = dict()
             header = next(reader)
@@ -54,7 +54,7 @@ class Differ:
 
 
 def load_countries_and_cities():
-    with open("data/worldcities.csv", "r") as fin:
+    with open("data/worldcities.csv", "r", encoding="utf8") as fin:
         reader = csv.reader(fin)
         header = next(reader)
         city_dict = {line[1]: line[4] for line in reader}

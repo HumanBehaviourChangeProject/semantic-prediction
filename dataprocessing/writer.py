@@ -16,7 +16,7 @@ def write_csv(doc_attrs:pd.DataFrame):
 def write_fuzzy(features, labels):
     with open("data/hbcp_gen.pkl", "wb") as fout:
         pickle.dump((features, np.array(labels)), fout)
-    with open("data/hbcp_gen.csv", "w") as fout:
+    with open("data/hbcp_gen.csv", "w", encoding="utf8") as fout:
         full_frame = pd.concat((features, pd.DataFrame(np.array(labels), columns=(("Outcome","Outcome"),), index=features.index)), axis=1).reset_index(names=["doc_id", "arm_id", "doc", "arm"])
         full_frame.to_csv(fout)
 
@@ -56,14 +56,14 @@ def write_bct_contexts(attributes, cleaned, doc_attrs, doc_name_map, arm_name_ma
                         (doc_name, doc_id, arm_name, arm_id)
                     ] = [context for (_, context) in values]
 
-    with open("/tmp/bct_context.csv", "wt") as fout:
+    with open("/tmp/bct_context.csv", "wt", encoding="utf8") as fout:
         w = csv.writer(fout)
         for attr, doc_con in bct_contexts.items():
             w.writerow([attr])
             for (doc, doc_id, arm_name, arm_id), contexts in doc_con.items():
                 w.writerow(["", doc, doc_id, arm_name, arm_id] + contexts)
 
-    with open("/tmp/outcome_value_contexts.csv", "w") as fout:
+    with open("/tmp/outcome_value_contexts.csv", "w", encoding="utf8") as fout:
         writer = csv.writer(fout)
         writer.writerow(
             ["document", "document_id", "arm", "arm_id"]

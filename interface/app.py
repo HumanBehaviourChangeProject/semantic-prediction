@@ -15,8 +15,8 @@ from matplotlib.gridspec import GridSpec
 
 
 ### Handle local imports
-os.chdir('/var/www/html/semantic-prediction')
-sys.path.append('/var/www/html/semantic-prediction')
+#os.chdir('/var/www/html/semantic-prediction')
+#sys.path.append('/var/www/html/semantic-prediction')
 
 
 src_file_path = inspect.getfile(lambda: None)

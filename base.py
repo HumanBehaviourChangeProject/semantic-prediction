@@ -86,13 +86,13 @@ def cross_val(model_classes, raw_features: np.ndarray, raw_labels: np.ndarray, v
     for model_cls, values in outs.items():
         os.makedirs(os.path.join(output_path, model_cls.name()), exist_ok=True)
         outfile = os.path.join(output_path, model_cls.name(), "crossval.txt")
-        with open(outfile, "w") as fout:
+        with open(outfile, "w", encoding="utf8") as fout:
             fout.write("\n".join(map(str, values)))
 
 
 
 def _load_data(path, filters, weighted=False, drop=None):
-    with open(path, "rb") as fin:
+    with open(path, "rb", encoding="utf8") as fin:
         features, labels = pickle.load(fin)
 
     features[np.isnan(features)] = 0
