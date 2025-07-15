@@ -33,8 +33,7 @@ def predict_request():
     prediction = predict(input)
 
     # restrict range of prediction to 0-100
-    prediction["testfit"] = np.clip(prediction["testfit"], 0, 100)
-    prediction["ctrlfit"] = np.clip(prediction["ctrlfit"], 0, 100)
+    prediction["fit"] = np.clip(prediction["fit"], 0, 100)
 
     return prediction
 

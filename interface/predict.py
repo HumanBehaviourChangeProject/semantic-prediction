@@ -89,15 +89,23 @@ class InputClass:
         return self.values["outcome"]
 
     def intervention(self):
+        if "intervention" not in self.values:
+            return []
         return self.values["intervention"]
 
     def delivery(self):
+        if "delivery" not in self.values:
+            return []
         return self.values["delivery"]
 
     def source(self):
+        if "source" not in self.values:
+            return []
         return self.values["source"]
 
     def pharmacological(self):
+        if "pharmacological" not in self.values:
+            return "-"
         return self.values["pharmacological"]
 
 # if two rules are the same, just the number is different, we want to remove one of them
@@ -195,17 +203,17 @@ def cleanup_rule(rule: list):
     for term in cleaned_terms:
         if term["comparator"] == "":
             if term["value"] == "":
-                cleaned_rule.append([term["feature"] + " " +term["unit"] , 1])
+                cleaned_rule.append(term["feature"] + " " + term["unit"])
             else:
-                cleaned_rule.append([term["feature"] + " (" + term["value"] + " " +term["unit"] + ")", 1])
+                cleaned_rule.append(term["feature"] + " (" + term["value"] + " " +term["unit"] + ")")
         elif term["comparator"] == "-":
-            cleaned_rule.append([term["feature"] + " (" + term["value_prev"] + term["comparator"] + term["value"] + " " + term["unit"] + ")", 1])
+            cleaned_rule.append(term["feature"] + " (" + term["value_prev"] + term["comparator"] + term["value"] + " " + term["unit"] + ")")
         else:
-            cleaned_rule.append([term["feature"] + " (" + term["comparator"] + " " + term["value"] + " " + term["unit"] + ")" , 1])
+            cleaned_rule.append(term["feature"] + " (" + term["comparator"] + " " + term["value"] + " " + term["unit"] + ")")
 
 
 
-    return [cleaned_rule, rule[1], rule[2]]  # return the cleaned rule, the impact and the fit
+    return [cleaned_rule, rule[1]]  # return the cleaned rule and the impact
 
 
 def cleanup_rules(rules):
@@ -224,7 +232,6 @@ def cleanup_rules(rules):
             # if the rule is already in the list, add the values together
             index = unique_rule_strs.index(rule_str)
             unique_rules[index][1] += rule[1]
-            unique_rules[index][2] += rule[2]
 
     return unique_rules
 
@@ -232,9 +239,9 @@ def cleanup_rules(rules):
 # predicts for the given input in InputClass format
 def predict(input: InputClass):
 
-    test = features.iloc[0].values
+    refined_input = features.iloc[0].values
     # Baseline
-    test[0: len(test)] = 0
+    refined_input[0: len(refined_input)] = 0
     fuzzynames = ['Mean age',
                   'Proportion identifying as female gender',
                   'Proportion identifying as male gender',
@@ -250,64 +257,44 @@ def predict(input: InputClass):
         for valname, valfs in list(fs.items()):
             colname = f"{fname} ({valname})"
             if colname in featurenames:
-                test[featurenames.index(colname)] = valfs(fvalue)
-    test[featurenames.index('aggregate patient role')] = input.patientrole()
-    test[featurenames.index('Biochemical verification')] = input.verification()
+                refined_input[featurenames.index(colname)] = valfs(fvalue)
+    refined_input[featurenames.index('aggregate patient role')] = input.patientrole()
+    refined_input[featurenames.index('Biochemical verification')] = input.verification()
     if input.outcome() is not None:
-        test[featurenames.index(input.outcome())] = True
+        refined_input[featurenames.index(input.outcome())] = True
 
-    # Shared attributes have been set, copy this to the control
-    control = [i for i in test]  # deep copy
-    control[featurenames.index('control')] = 1
 
+
+    has_interventions = False
     # Set intervention-specific attributes
     for x in input.intervention():
-        test[featurenames.index(x)] = True
+        refined_input[featurenames.index(x)] = True
+        has_interventions = True
     for x in input.delivery():
-        test[featurenames.index(x)] = True
+        refined_input[featurenames.index(x)] = True
+        has_interventions = True
     for x in input.source():
-        test[featurenames.index(x)] = True
+        refined_input[featurenames.index(x)] = True
+        has_interventions = True
     if input.pharmacological() != "-":
-        test[featurenames.index(input.pharmacological())] = True
-        test[featurenames.index('11.1 Pharmacological support')] = True
+        refined_input[featurenames.index(input.pharmacological())] = True
+        refined_input[featurenames.index('11.1 Pharmacological support')] = True
+        has_interventions = True
+
+    # If no interventions are set, add the control group features
+    if not has_interventions:
+        # Shared attributes have been set, copy this to the control
+        refined_input = [i for i in refined_input]  # deep copy
+        refined_input[featurenames.index('control')] = 1
 
     # run prediction
     extendednames = featurenames + ["not " + n for n in featurenames]
-    (testrls ,testfit) = apply_rules(model ,test ,extendednames)
-    (ctrlrls ,ctrlfit) = apply_rules(model ,control ,extendednames)
+    (rules ,fit) = apply_rules(model ,refined_input ,extendednames)
 
     # clean up rules
-    testrls = cleanup_rules(testrls)
-    ctrlrls = cleanup_rules(ctrlrls)
+    rules = cleanup_rules(rules)
 
-
-
-    testimpacts = [a[1] for a in testrls]
-    ctrlimpacts = [b[1] for b in ctrlrls]
-    testonlyimpacts = [a[1] for a in testrls if a not in ctrlrls]
-    testnames = [a[0] for a  in testrls]
-    ctrlnames = [b[0] for b in ctrlrls]
-    testrulestrs = []
-    ctrlrulestrs = []
-
-    NO_RULES = 30
-
-    for i ,ruleslst in enumerate(ctrlnames):
-        ruleslststr = [x for (x ,w) in ruleslst] # +"(" +str(round(w,1))+")"
-        impact = ctrlimpacts[i]
-        rulestr = ' & '.join(ruleslststr)
-        rulestr = rulestr + ": " + str(round(impact ,1))
-        ctrlrulestrs.append(rulestr)
-
-    for i ,ruleslst in enumerate(testnames):
-        ruleslststr = [x for (x ,w) in ruleslst] # + "(" +str(round(w,1))+")"
-        impact = testimpacts[i]
-        rulestr = ' & '.join(ruleslststr)
-        rulestr = rulestr + ": " + str(round(impact ,1))
-        if rulestr not in ctrlrulestrs:
-            testrulestrs.append(rulestr)
-
-    return {"testfit": testfit, "ctrlfit": ctrlfit, "testrls": testrls, "ctrlrls": ctrlrls}
+    return {"fit": fit, "rules": rules}
 
 example_input = {
     "meanage": 20,
@@ -326,3 +313,5 @@ example_input = {
 example_input_instance = InputClass(example_input)
 
 result = predict(example_input_instance)
+
+print(result)
